@@ -1,1 +1,20 @@
 
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.driverflux.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>DriverFlux</name>
+    <description>Controle Financeiro de Corridas e Empréstimos</description>
+    <author email="seuemail@exemplo.com">Seu Nome</author>
+    <content src="index.html" />
+    
+    <preference name="AllowInlineMediaPlayback" value="false" />
+    <preference name="BackupWebStorage" value="cloud" />
+    <preference name="DisallowOverscroll" value="true" />
+    
+    <config-file target="AndroidManifest.xml" parent="/*">
+        <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+        <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    </config-file>
+
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+</widget>
