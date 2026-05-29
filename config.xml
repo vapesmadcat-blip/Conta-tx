@@ -2,5 +2,14 @@
 <widget id="com.example.app" version="1.0.0">
     <name>App Name</name>
     <description>Description</description>
-    <!-- ensure all tags are properly closed -->
+    
+    <!-- ⬇️ ADICIONE AQUI - Permissões para GPS -->
+    <permission name="ACCESS_FINE_LOCATION" />
+    <permission name="ACCESS_COARSE_LOCATION" />
+    
+    <!-- ⬇️ ADICIONE AQUI - Plugin de Geolocalização -->
+    <plugin name="cordova-plugin-geolocation" spec="^4.1.0">
+        <variable name="GEOLOCATION_USAGE_DESCRIPTION" value="O app precisa acessar seu GPS para registrar a localização das corridas" />
+    </plugin>
+    
 </widget>
