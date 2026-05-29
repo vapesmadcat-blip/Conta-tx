@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -42,7 +42,7 @@
 
         header {
             text-align: center;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         header h1 {
@@ -58,100 +58,87 @@
             margin-top: 4px;
         }
 
-        .btn-group-main {
+        /* Grade de botões principais do topo */
+        .btn-grid-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 20px;
+            gap: 10px;
+            margin-bottom: 16px;
         }
 
         button {
             border: none;
-            padding: 14px;
-            border-radius: 12px;
-            font-size: 15px;
+            padding: 12px 8px;
+            border-radius: 10px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
             transition: all 0.2s ease;
         }
 
-        button:active {
-            transform: scale(0.97);
+        button:active { transform: scale(0.97); }
+
+        .btn-incluir { background: var(--primary); color: white; }
+        .btn-consultar { background: #4b5563; color: white; }
+        .btn-totais { background: #6366f1; color: white; }
+        .btn-relatorio { background: var(--success); color: white; }
+        .btn-alterar { background: var(--warning); color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+        .btn-cancel { background: #e2e8f0; color: var(--texto); width: 40%; }
+
+        /* Barra de pesquisa de consulta (oculta por padrão) */
+        .search-container {
+            display: none;
+            margin-bottom: 16px;
+            animation: slideDown 0.2s ease-out;
         }
 
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        
-        .btn-success { background: var(--success); color: white; grid-column: span 2; }
-        
-        .btn-warning { background: var(--warning); color: white; padding: 8px 14px; font-size: 13px; border-radius: 8px; }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .search-container input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+        }
 
         .card {
             background: var(--card-bg);
             border-radius: 16px;
             padding: 20px;
             box-shadow: var(--shadow);
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .card h2 {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             color: var(--texto);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
-        .table-wrapper {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            text-align: left;
-            padding: 10px;
-            font-size: 12px;
-            color: var(--texto-secundario);
-            border-bottom: 2px solid #edf2f7;
-            text-transform: uppercase;
-        }
-
-        td {
-            padding: 14px 10px;
-            font-size: 14px;
-            border-bottom: 1px solid #edf2f7;
-        }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 10px; font-size: 12px; color: var(--texto-secundario); border-bottom: 2px solid #edf2f7; text-transform: uppercase; }
+        td { padding: 12px 10px; font-size: 14px; border-bottom: 1px solid #edf2f7; }
 
         .row-id { font-weight: bold; color: var(--texto-secundario); }
         .row-cliente { font-weight: 600; color: var(--texto); }
 
-        .result-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            font-size: 15px;
-        }
-
-        .result-row.total-final {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 2px dashed #e2e8f0;
-            font-size: 18px;
-            font-weight: 800;
-            color: var(--primary);
-        }
-
+        .result-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .result-row.total-final { margin-top: 14px; padding-top: 14px; border-top: 2px dashed #e2e8f0; font-size: 17px; font-weight: 800; color: var(--primary); }
         .danger-text { color: var(--danger); font-weight: 600; }
 
+        /* Estrutura do Janela Modal */
         .modal {
             display: none;
             position: fixed;
@@ -171,74 +158,29 @@
             width: 100%;
             max-width: 400px;
             box-shadow: var(--shadow);
-            animation: scaleUp 0.2s ease-out;
-        }
-
-        @keyframes scaleUp {
-            from { transform: scale(0.95); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
         }
 
         .modal h3 { margin-bottom: 16px; font-size: 18px; }
+        .input-group { margin-bottom: 14px; }
+        .input-group label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-secundario); margin-bottom: 4px; }
+        .input-group input { width: 100%; padding: 11px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; }
+        .input-group input:focus { border-color: var(--primary); }
 
-        .input-group {
-            margin-bottom: 16px;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--texto-secundario);
-            margin-bottom: 6px;
-        }
-
-        .input-group input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 16px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .input-group input:focus {
-            border-color: var(--primary);
-        }
-
+        /* Quadro de status do GPS */
         .gps-display-box {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 10px;
-            padding: 10px 12px;
+            padding: 10px;
             font-size: 13px;
             font-weight: 500;
-            margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 6px;
         }
 
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .btn-cancel { background: #e2e8f0; color: var(--texto); width: 40%; }
-
-        .report-output {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 16px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 13px;
-            white-space: pre-wrap;
-            line-height: 1.5;
-            display: none;
-        }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .report-output { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 13px; white-space: pre-wrap; display: none; }
     </style>
 </head>
 <body>
@@ -246,8 +188,87 @@
 <div class="app-container">
     <header>
         <h1>DriverFlux</h1>
-        <p>Gestão Inteligente de Corridas e Auxílios</p>
+        <p>Gestão de Corridas e Auxílios</p>
     </header>
 
-    <div class="btn-group-main">
-        <button class="btn-primary" onclick="abrirModalInsercao()">➕ Adicionar</button>
+    <div class="btn-grid-actions">
+        <button class="btn-incluir" onclick="abrirModalInsercao()">➕ Incluir</button>
+        <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Consultar</button>
+        <button class="btn-totais" onclick="calcularTotais()">📊 Totais</button>
+        <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
+    </div>
+
+    <div class="search-container" id="containerPesquisa">
+        <input type="text" id="inputPesquisa" placeholder="Filtrar por nome do cliente..." oninput="filtrarTabela()">
+    </div>
+
+    <div class="card">
+        <h2>Lançamentos Atuais</h2>
+        <div class="table-wrapper">
+            <table id="tabelaDados">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Empréstimo</th>
+                        <th>Corrida</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" id="cardTotais" style="display: none;">
+        <h2>Resumo Calculado</h2>
+        <div class="result-row"><span>Empréstimos Brutos:</span> <span id="totBruto">R$ 0,00</span></div>
+        <div class="result-row"><span>Taxa Adicional (+20%):</span> <span id="totAcrescimo" class="danger-text">+ R$ 0,00</span></div>
+        <div class="result-row"><span>Total Corridas:</span> <span id="totCorridas">R$ 0,00</span></div>
+        <div class="result-row total-final"><span>Total Geral a Receber:</span> <span id="totGeral">R$ 0,00</span></div>
+    </div>
+
+    <div class="card" id="cardRelatorio" style="display: none;">
+        <h2>Relatório Comercial</h2>
+        <div class="report-output" id="reportOutput"></div>
+        <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    </div>
+</div>
+
+<div class="modal" id="formModal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Novo Lançamento</h3>
+        <input type="hidden" id="editId">
+        
+        <div class="input-group">
+            <label for="inputCliente">Nome do Cliente</label>
+            <input type="text" id="inputCliente" placeholder="Nome completo" list="listaClientes" autocomplete="off">
+            <datalist id="listaClientes"></datalist>
+        </div>
+
+        <div class="input-group">
+            <label for="inputEmprestimo">Dinheiro Emprestado (R$)</label>
+            <input type="number" step="0.01" id="inputEmprestimo" placeholder="0,00">
+        </div>
+
+        <div class="input-group">
+            <label for="inputCorrida">Valor da Corrida (R$)</label>
+            <input type="number" step="0.01" id="inputCorrida" placeholder="0,00">
+        </div>
+
+        <div class="input-group">
+            <label>Localização (GPS)</label>
+            <div class="gps-display-box" id="gpsStatus">🔴 Aguardando sinal...</div>
+        </div>
+
+        <div class="modal-buttons">
+            <button class="btn-cancel" onclick="fecharModal()">Voltar</button>
+            <button class="btn-incluir" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/geolocation.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
