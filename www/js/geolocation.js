@@ -31,10 +31,12 @@ const GeoLocation = {
         }
 
         this.aguardando = true;
+        
+        // Configurações para forçar o hardware do GPS a responder e ignorar cache antigo
         const opcoes = {
             enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+            timeout: 15000, // 15 segundos para dar tempo do sistema chamar a permissão nativa
+            maximumAge: 0   // Força puxar a localização atual em tempo real
         };
 
         navigator.geolocation.getCurrentPosition(
@@ -47,17 +49,19 @@ const GeoLocation = {
             (error) => {
                 this.aguardando = false;
                 let mensagem = 'Erro ao obter localização';
+                
                 switch(error.code) {
                     case error.PERMISSION_DENIED:
-                        mensagem = 'Permissão de localização negada. Verifique as configurações do app.';
+                        mensagem = 'Permissão do GPS negada pelo usuário.';
                         break;
                     case error.POSITION_UNAVAILABLE:
-                        mensagem = 'Informação de localização indisponível';
+                        mensagem = 'Sinal de GPS indisponível no momento.';
                         break;
                     case error.TIMEOUT:
-                        mensagem = 'Timeout ao obter localização. Tente novamente.';
+                        mensagem = 'Tempo esgotado para obter localização.';
                         break;
                 }
+                
                 if (onError) onError(mensagem);
             },
             opcoes
@@ -89,12 +93,12 @@ const GeoLocation = {
 
     /**
      * Formata as coordenadas em string legível
-     * @returns {String} Formato: "Lat: X.XXXX, Lng: X.XXXX (±XX metros)"
+     * @returns {String} Formato: "Lat: X.XXXX, Lng: X.XXXX"
      */
     formatarCoordenadas: function() {
         if (!this.coordenadas) return 'Sem localização';
-        const { latitude, longitude, accuracy } = this.coordenadas;
-        return `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} (±${Math.round(accuracy)}m)`;
+        const { latitude, longitude } = this.coordenadas;
+        return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
     },
 
     /**
@@ -110,8 +114,3 @@ const GeoLocation = {
         } : null;
     }
 };
-
-// Inicializa quando o documento carrega
-document.addEventListener('DOMContentLoaded', function() {
-    GeoLocation.init();
-});
