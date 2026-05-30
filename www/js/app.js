@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Teste e Relatório de Caixa Corrigido
+ * Lógica de Negócio Completa com Atalhos de Teste e Botão de Ativação Demo Integrado
  */
 
 const firebaseConfig = {
@@ -33,12 +33,15 @@ let motoristasCadastroMaster = {};
 
 const LIMITE_DEMO = 10;
 
+// SEMENTES MATEMÁTICAS ORIGINAIS PRESERVADAS
 function obterSenhaDefinitiva(desafio) { return (parseInt(desafio) * 13) + 6182; }
 function obterSenhaDemo(desafio) { return (parseInt(desafio) * 11) + 3947; }
 
 function checarLicenciamento() {
     const statusLicenca = localStorage.getItem('driverflux_licenca_ativa');
-    if (statusLicenca === 'true') {
+    const usuarioSalvo = localStorage.getItem('driverflux_usuario_logado');
+
+    if (statusLicenca === 'true' && (usuarioSalvo || localStorage.getItem('driverflux_modo_demo') === 'true')) {
         document.getElementById('telaAtivacao').style.display = 'none';
         if (localStorage.getItem('driverflux_modo_demo') === 'true') {
             document.getElementById('telaLogin').style.display = 'none';
@@ -52,6 +55,8 @@ function checarLicenciamento() {
         localStorage.setItem('driverflux_codigo_desafio', desafio);
         document.getElementById('txtCodigoDesafio').innerText = desafio;
         document.getElementById('telaAtivacao').style.display = 'block';
+        document.getElementById('telaLogin').style.display = 'none';
+        if(document.getElementById('conteudoApp')) document.getElementById('conteudoApp').style.display = 'none';
     }
 }
 
@@ -60,7 +65,7 @@ function verificarAtivacao() {
     const inputVal = document.getElementById('inputContraSenha').value.trim();
     if (!inputVal) return alert("⚠️ Digite a contra-senha.");
     
-    const digitada = parseInt(inputVal);
+    const digitada = parseInt(inputVal, 10);
 
     if (digitada === 222) {
         alert("🛠️ [Bancada] Forçando ativação do MODO COMPLETO...");
@@ -91,10 +96,6 @@ function verificarAtivacao() {
     } else { 
         alert("❌ Contra-senha incorreta!"); 
     }
-}
-
-function activarVersaoCompletaDefinitiva() {
-    ativarVersãoCompletaDefinitiva();
 }
 
 function ativarVersãoCompletaDefinitiva() {
@@ -151,6 +152,39 @@ function verificarSessaoLogin() {
         iniciarFirebaseSeNecessario();
         garantirUsuariosBaseNoFirebase();
     }
+}
+
+// ENGENHARIA DE RENDER: Cria e atualiza o botão de upgrade dinamicamente dentro do painel operativo
+function renderToggleAcoesDemo() {
+    if (localStorage.getItem('driverflux_modo_demo') !== 'true') return;
+    
+    let containerAviso = document.getElementById('badgeAvisoContador');
+    if (!containerAviso) {
+        containerAviso = document.createElement('div');
+        containerAviso.id = "badgeAvisoContador";
+        containerAviso.style.cssText = "background:#fffbeb; color:#b45309; font-size:12px; padding:10px; border-radius:10px; text-align:center; width:100%; margin-bottom:14px; font-weight:700; border:1px solid #fde68a; cursor:pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05);";
+        
+        const divApp = document.getElementById('conteudoApp');
+        if (divApp) {
+            divApp.insertBefore(containerAviso, divApp.firstChild);
+        }
+    }
+    
+    containerAviso.innerText = `📈 Limite Demo: ${registros.length} de ${LIMITE_DEMO} registros. (Clique aqui para Ativar versão Oficial)`;
+    
+    containerAviso.onclick = function() {
+        let desafioAtual = localStorage.getItem('driverflux_codigo_desafio') || "0000";
+        let senhaUpgrade = prompt(`🔑 VALIDAÇÃO DEFINITIVA\nDesafio Atual: ${desafioAtual}\n\nInsira a Contra-Senha de Liberação Definitiva (Ou 222 na bancada):`);
+        
+        if (senhaUpgrade) {
+            let digitadaUpgrade = parseInt(senhaUpgrade.trim(), 10);
+            if (digitadaUpgrade === 222 || digitadaUpgrade === obtenerSenhaDefinitiva(desafioAtual)) {
+                ativarVersãoCompletaDefinitiva();
+            } else {
+                alert("❌ Contra-senha definitiva inválida para este desafio!");
+            }
+        }
+    };
 }
 
 function abrirModalEdicao(id) { 
@@ -308,13 +342,12 @@ async function salvarDados() {
         if (!nomeCliente) return alert("⚠️ Digite o nome do cliente.");
     }
 
-    console.log("Capturando GPS final...");
     const gpsFinal = await capturarGpsPromessa();
-
     const agora = new Date();
     const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
 
     let dadosCorrida = {
+        id: registros.length > 0 ? Math.max(...registros.map(r => r.id)) + 1 : 1,
         tipo: tipo, 
         cliente: nomeCliente, 
         emprestado: vEmprestimo, 
@@ -332,7 +365,6 @@ async function salvarDados() {
                 registros[index] = dadosCorrida;
             }
         } else {
-            dadosCorrida.id = registros.length > 0 ? Math.max(...registros.map(r => r.id)) + 1 : 1;
             registros.push(dadosCorrida);
         }
         localStorage.setItem('driverflux_demo_reg', JSON.stringify(registros));
@@ -348,7 +380,6 @@ async function salvarDados() {
                 }).catch(err => alert("Erro ao atualizar: " + err.message));
             }
         } else {
-            dadosCorrida.id = registros.length > 0 ? Math.max(...registros.map(r => r.id)) + 1 : 1;
             db.ref(`corridas_por_turno/${idTurnoAtivo}`).push(dadosCorrida).then(() => {
                 finalizarSalvamento(dadosCorrida, whatsCliente);
             }).catch(err => alert("Erro ao salvar: " + err.message));
@@ -360,6 +391,9 @@ function finalizarSalvamento(dados, whats) {
     fecharModal(); 
     renderizarTabela(); 
     atualizarListaSugestoes();
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        renderToggleAcoesDemo();
+    }
     if (dados.tipo === 'credito') { 
         prepararDisparoReciboNativo(dados, whats); 
     }
@@ -456,6 +490,7 @@ function efetuarLogout() {
 
 function efetuarLogoutPronto() {
     localStorage.removeItem('driverflux_usuario_logado'); 
+    localStorage.removeItem('driverflux_licenca_ativa'); 
     usuarioLogado = ""; 
     idTurnoAtivo = "";
     if(document.getElementById('cardTotais')) document.getElementById('cardTotais').style.display = 'none'; 
@@ -494,6 +529,7 @@ function inicializarMotorista() {
         const salvo = localStorage.getItem('driverflux_demo_reg');
         registros = salvo ? JSON.parse(salvo) : [];
         renderizarTabela();
+        renderToggleAcoesDemo(); // Garante o gatilho visual do botão
         return;
     }
     iniciarFirebaseSeNecessario();
@@ -576,10 +612,8 @@ function atualizarListaSugestoes() {
     });
 }
 
-// CORREÇÃO CENTRAL: Função do relatório completamente atualizada por herança automática e pop-up volátil seguro
 function gerarRelatorio() {
     let tNormais = 0, tCredito = 0, tEmprestado = 0;
-    
     registros.forEach(r => { 
         if (r.tipo === 'credito') { 
             tCredito += r.corrida; 
