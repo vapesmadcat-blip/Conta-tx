@@ -396,20 +396,38 @@ function calcularTotais() {
 
 function gerarRelatorio() {
     let tNormais = 0, tCredito = 0, tEmprestado = 0;
-    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n=========================================\n\n`;
+    
+    // Processamento em background dos dados reais da memória
     registros.forEach(r => { 
         if (r.tipo === 'credito') { 
             tCredito += r.corrida; 
             tEmprestado += r.emprestado; 
-            txt += `[CRÉDITO] Reg #${r.id} - 👤 ${r.cliente}\n  Corrida: ${formatarMoeda(r.corrida)} | Empréstimo: ${formatarMoeda(r.emprestado)}\n`; 
         } else { 
             tNormais += r.corrida; 
-            txt += `[NORMAL] Reg #${r.id} - Corrida: ${formatarMoeda(r.corrida)}\n`; 
         } 
     });
+    
     let fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
-    txt += `\n=========================================\n(+) Troco Inicial: ${formatarMoeda(fundo)}\n(+) Dinheiro Caixa: ${formatarMoeda(tNormais)}\n-----------------------------------------\n(=) TOTAL EM CAIXA: ${formatarMoeda(fundo + tNormais)}\n\n(+) Corridas Fiado: ${formatarMoeda(tCredito)}\n(+) Empréstimos: ${formatarMoeda(tEmprestado)}\n(+) Juros (20%): ${formatarMoeda(tEmprestado * 0.20)}\n═══════════════════════════════════\n💰 TOTAL GERAL: ${formatarMoeda(fundo + tNormais + tCredito + tEmprestado + (tEmprestado * 0.20))}\n═══════════════════════════════════\n⏰ Relatório gerado automaticamente pelo DriverFlux`;
-    document.getElementById('reportOutput').innerText = txt; document.getElementById('reportOutput').style.display = 'block'; document.getElementById('cardRelatorio').style.display = 'block';
+    let totalCarro = fundo + tNormais;
+
+    // Montagem do texto engessado do fechamento
+    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n`;
+    txt += `=========================================\n\n`;
+    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n`;
+    txt += `(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n`;
+    txt += `(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n`;
+    txt += `(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n`;
+    txt += `-----------------------------------------\n`;
+    txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n`;
+    txt += `=========================================\n`;
+
+    // Visualizador nativo Read-Only. Some da tela ao clicar em Voltar/Cancelar
+    let imprimir = confirm(`📄 FECHAMENTO DE TURNO:\n\n${txt}\n\nDeseja abrir a janela de impressão do sistema?`);
+    
+    if (imprimir) {
+        document.getElementById('reportOutput').innerText = txt;
+        window.print();
+    }
 }
 
 function processarConsultaCliente() {
