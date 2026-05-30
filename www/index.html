@@ -38,6 +38,33 @@
             width: 100%;
             max-width: 500px;
             margin-top: 10px;
+            display: none;
+        }
+
+        .activation-container {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            margin-top: 40px;
+            text-align: center;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .code-display {
+            background: #edf2f7;
+            border: 2px dashed var(--primary);
+            padding: 15px;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: var(--texto);
+            border-radius: 12px;
+            margin: 20px 0;
         }
 
         header {
@@ -88,16 +115,9 @@
         .btn-alterar { background: var(--warning); color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
         .btn-cancel { background: #e2e8f0; color: var(--texto); width: 40%; }
 
-        /* Painel de Consulta Avançada e Pagamentos */
         .search-container {
             display: none;
             margin-bottom: 16px;
-            animation: slideDown 0.2s ease-out;
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .search-box {
@@ -115,7 +135,6 @@
             outline: none;
         }
 
-        /* Ficha Resumo do Cliente */
         .client-ledger-box {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -235,7 +254,22 @@
 </head>
 <body>
 
-<div class="app-container">
+<div class="activation-container" id="telaAtivacao">
+    <div class="card" style="padding: 30px 20px;">
+        <h2>Ativação do Sistema</h2>
+        <p style="font-size: 14px; color: var(--texto-secundario); margin: 10px 0;">
+            Informe o código abaixo ao administrador para receber sua contra-senha de liberação.
+        </p>
+        <div class="code-display" id="txtCodigoDesafio">------</div>
+        <div class="input-group" style="text-align: left;">
+            <label for="inputContraSenha">Digite a Contra-Senha</label>
+            <input type="number" id="inputContraSenha" placeholder="Digite o código de liberação" style="width:100%; padding:12px; border:2px solid #cbd5e1; border-radius:10px; font-size:16px;">
+        </div>
+        <button class="btn-incluir" style="width: 100%; margin-top: 15px; padding: 14px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
+    </div>
+</div>
+
+<div class="app-container" id="conteudoApp">
     <header>
         <h1>DriverFlux</h1>
         <p>Gestão de Corridas e Auxílios</p>
@@ -333,6 +367,9 @@
         </div>
     </div>
 </div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script src="js/geolocation.js"></script>
 <script src="js/app.js"></script>
