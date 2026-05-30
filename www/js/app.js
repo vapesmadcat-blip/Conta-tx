@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Teste e Persistência Unificada Fora do Fluxo de GPS
+ * Lógica de Negócio Completa com Atalhos de Teste e Persistência Unificada Direta em salvarDados
  */
 
 const firebaseConfig = {
@@ -24,7 +24,7 @@ function iniciarFirebaseSeNecessario() {
 let turnosHistoricoMaster = {}; 
 let registros = [];             
 let pagamentos = [];            
-let coordenadaAtual = "Não capturado"; // Estado inicial seguro
+let coordenadaAtual = "Não capturado"; 
 let filtroTexto = "";
 let usuarioLogado = "";         
 let idTurnoAtivo = "";          
@@ -130,7 +130,6 @@ function activarVersaoCompletaDefinitiva() {
 function abrirModalEdicao(id) { 
     if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) { alert("🔒 Edição de registros bloqueada no modo de demonstração."); return; }
     
-    // Dispara a busca do satélite antecipada ao abrir a tela de pagamento
     capturarGpsAntecipadoEAtualizarVisor();
 
     if (id === null) {
@@ -170,7 +169,7 @@ function capturarGpsAntecipadoEAtualizarVisor() {
     }
 }
 
-// CORREÇÃO E SANEAMENTO CENTRAL: A persistência foi extraída para o fluxo principal (fora de callbacks)
+// SOLUÇÃO UNIFICADA: Salva diretamente sem dependências assíncronas no momento do clique
 function salvarDados() {
     const tipo = document.getElementById('inputTipoLancamento').value;
     const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
@@ -187,13 +186,11 @@ function salvarDados() {
     const agora = new Date();
     const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
 
-    // Monta o objeto de dados unificado herdando a coordenadaAtual atualizada (ou o estado padrão seguro)
     const novaCorrida = {
         id: registros.length > 0 ? Math.max(...registros.map(r => r.id)) + 1 : 1, 
         tipo: tipo, cliente: nomeCliente, emprestado: vEmprestimo, corrida: vCorrida, dataHora: dataHoraStr, gps: coordenadaAtual, whatsCliente: whatsCliente
     };
 
-    // Fluxo Linear Único de Gravação
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         registros.push(novaCorrida);
         localStorage.setItem('driverflux_demo_reg', JSON.stringify(registros));
@@ -305,28 +302,18 @@ function calcularTotais() {
 
 function gerarRelatorio() {
     let tNormais = 0, tCredito = 0, tEmprestado = 0;
-    
-    registros.forEach(r => { 
-        if (r.tipo === 'credito') { 
-            tCredito += r.corrida; 
-            tEmprestado += r.emprestado; 
-        } else { 
-            tNormais += r.corrida; 
-        } 
-    });
+    registros.forEach(r => { if (r.tipo === 'credito') { tCredito += r.corrida; tEmprestado += r.emprestado; } else { tNormais += r.corrida; } });
     
     let fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
     let totalCarro = fundo + tNormais;
 
-    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n`;
-    txt += `=========================================\n\n`;
+    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n=========================================\n\n`;
     txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n`;
     txt += `(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n`;
     txt += `(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n`;
     txt += `(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n`;
     txt += `-----------------------------------------\n`;
-    txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n`;
-    txt += `=========================================\n`;
+    txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n=========================================\n`;
 
     let imprimir = confirm(`📄 FECHAMENTO DE TURNO:\n\n${txt}\n\nDeseja abrir a janela de impressão do sistema?`);
     if (imprimir) {
@@ -383,6 +370,7 @@ function formatarMoeda(v) { return v.toLocaleString('pt-BR', { style: 'currency'
 function garantirUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (snapshot) => { if (!snapshot.exists()) { db.ref("usuarios").set({ "master": { senha: "master123", tipo: "gerente" }, "andre": { senha: "123", tipo: "folguista" }, "pedro": { senha: "456", tipo: "efetivo" } }); } }); }
 function ajustarCamposPorModalidade() { const tipo = document.getElementById('inputTipoLancamento').value; document.getElementById('camposCreditoOpcionais').style.display = (tipo === 'credito') ? 'block' : 'none'; }
 function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
+
 function cadastrarNovoMotoristaMaster() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') { return alert("🔒 Cadastro de motoristas bloqueado no modo de demonstração."); }
     let novoUser = prompt("👤 Digite o IDENTIFICADOR do novo motorista (Tudo junto, minúsculo. Ex: carlos):"); if (!novoUser) return;
@@ -394,6 +382,6 @@ function cadastrarNovoMotoristaMaster() {
 }
 
 function inicializarMaster() { db.ref("usuarios").once("value", (snapshotUser) => { motoristasCadastroMaster = snapshotUser.val() || {}; db.ref("turnos_operacionais").on("value", (snapshot) => { const data = snapshot.val(); const select = document.getElementById('selectFiltroTurnoMaster'); select.innerHTML = '<option value="">-- Escolha um Turno / Caixa para Auditar --</option>'; turnosHistoricoMaster = {}; if (data) { Object.keys(data).forEach(motorista => { Object.keys(data[motorista]).forEach(turnoId => { const t = data[motorista][turnoId]; turnosHistoricoMaster[turnoId] = t; let mInfo = motoristasCadastroMaster[motorista]; let tContrato = (mInfo && mInfo.tipo) ? mInfo.tipo : (t.tipoContrato || "efetivo"); const opt = document.createElement('option'); opt.value = turnoId; const statusIcon = t.status === 'aberto' ? '🟢 (Ativo)' : '🔴 (Fechado)'; opt.innerText = `${statusIcon} ${t.motorista.toUpperCase()} [${tContrato.toUpperCase()}] | Início: ${t.abertura}`; select.appendChild(opt); }); }); } }); }); }
-function selecionarTurnoParaVerificacaoMaster() { const selectedId = document.getElementById('selectFiltroTurnoMaster').value; document.getElementById('cardTotais').style.display = 'none'; document.getElementById('cardRelatorio').style.display = 'none'; if (!selectedId) { registros = []; renderizarTabela(); document.getElementById('lblIdTurnoAtivo').innerText = "Turno: Nenhum selecionado"; return; } metadadosTurno = turnosHistoricoMaster[selectedId]; idTurnoAtivo = selectedId; let contratoLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO"; document.getElementById('lblIdTurnoAtivo').innerText = `Auditoria Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()} | Tipo: ${contractLog}`; db.ref(`corridas_por_turno/${selectedId}`).once("value", (snapshot) => { registros = []; const data = snapshot.val(); if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); } renderizarTabela(); }); }
+function selecionarTurnoParaVerificacaoMaster() { const selectedId = document.getElementById('selectFiltroTurnoMaster').value; document.getElementById('cardTotais').style.display = 'none'; document.getElementById('cardRelatorio').style.display = 'none'; if (!selectedId) { registros = []; renderizarTabela(); document.getElementById('lblIdTurnoAtivo').innerText = "Turno: Nenhum selecionado"; return; } metadadosTurno = turnosHistoricoMaster[selectedId]; idTurnoAtivo = selectedId; let contratoLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO"; document.getElementById('lblIdTurnoAtivo').innerText = `Auditoria Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()} | Tipo: ${contratoLog}`; db.ref(`corridas_por_turno/${selectedId}`).once("value", (snapshot) => { registros = []; const data = snapshot.val(); if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); } renderizarTabela(); }); }
 
 document.addEventListener('DOMContentLoaded', () => { checarLicenciamento(); });
