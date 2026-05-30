@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Integrado com Cadastro de Motoristas Master e Envio de Comprovantes via WhatsApp
+ * Integrado com Cadastro de Motoristas Master e Visualização Prévia de Recibos antes do Envio
  */
 
 const firebaseConfig = {
@@ -77,7 +77,6 @@ function verificarAtivacao() {
 }
 
 function activarVersaoCompletaDefinitiva() {
-    // Mantido por compatibilidade de chamada
     ativarVersãoCompletaDefinitiva();
 }
 
@@ -301,18 +300,16 @@ function finalizarLancamentoCorrida(tipo, cliente, corrida, emprestimo, dataHora
 
     if (tipo === 'credito') {
         const totalDevido = corrida + (emprestimo * 1.20);
-        let txt = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${dataHora}\n👤 *Cliente:* ${cliente.toUpperCase()}\n-----------------------------------------\n🚕 *Corrida:* R$ ${corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${emprestimo.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n\n_Sumário de cobrança ativo lançado._`;
+        let txt = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${dataHora}\n👤 *Cliente:* ${cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${emprestimo.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n\n_Sumário de cobrança ativo lançado._`;
         let url = whatsapp ? `https://api.whatsapp.com/send?phone=55${whatsapp}&text=${encodeURIComponent(txt)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(txt)}`;
         window.open(url, '_system');
     }
 }
 
+// CORRIGIDO: Agora exibe prévia do cupom na tela e pede confirmação antes de chamar o WhatsApp
 function emititNotaFiscalWhatsApp(idCorrida) {
     const reg = registros.find(r => r.id === idCorrida);
     if (!reg) return alert("Corrida não encontrada.");
-
-    let numeroWhats = prompt("📱 Digite o WhatsApp do passageiro corporativo (Com DDD, apenas números):", "51");
-    if (!numeroWhats) return;
 
     let descCliente = reg.tipo === 'credito' ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
 
@@ -330,26 +327,37 @@ function emititNotaFiscalWhatsApp(idCorrida) {
     txtNota += `=========================================\n\n`;
     txtNota += `_Comprovante válido para fins de auditoria empresarial._`;
 
-    let urlWhats = `https://api.whatsapp.com/send?phone=55${numeroWhats}&text=${encodeURIComponent(txtNota)}`;
-    window.open(urlWhats, '_system');
+    let confirmarEnvio = confirm(`📄 CONTEÚDO DO RECIBO GERADO:\n\n${txtNota.replace(/\*/g, '')}\n\nDeseja enviar este recibo agora via WhatsApp?`);
+    
+    if (confirmarEnvio) {
+        let numeroWhats = prompt("📱 Digite o WhatsApp do passageiro (Com DDD, apenas números):", "51");
+        if (!numeroWhats) return;
+        
+        let urlWhats = `https://api.whatsapp.com/send?phone=55${numeroWhats}&text=${encodeURIComponent(txtNota)}`;
+        window.open(urlWhats, '_system');
+    }
 }
 
-// CORREÇÃO: Função adicionada para re-enviar o recibo detalhado a qualquer momento
+// CORRIGIDO: Agora exibe prévia da pendência na tela e pede confirmação antes de chamar o WhatsApp
 function revierComprovanteWhats(idCorrida) {
     const reg = registros.find(r => r.id === idCorrida);
     if (!reg) return alert("Corrida não encontrada.");
     
-    let whatsapp = prompt("📱 Digite o WhatsApp para envio (Com DDD, apenas números):", "51");
-    if (!whatsapp) return;
-
     const totalDevido = reg.corrida + ((reg.emprestado || 0) * 1.20);
+    
     let txt = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${(reg.emprestado || 0).toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}`;
     
-    let url = `https://api.whatsapp.com/send?phone=55${whatsapp}&text=${encodeURIComponent(txt)}`;
-    window.open(url, '_system');
+    let confirmarEnvio = confirm(`📄 CONTEÚDO DO COMPROVANTE GERADO:\n\n${txt.replace(/\*/g, '')}\n\nDeseja enviar esta cobrança agora via WhatsApp?`);
+
+    if (confirmarEnvio) {
+        let whatsapp = prompt("📱 Digite o WhatsApp para envio (Com DDD, apenas números):", "51");
+        if (!whatsapp) return;
+
+        let url = `https://api.whatsapp.com/send?phone=55${whatsapp}&text=${encodeURIComponent(txt)}`;
+        window.open(url, '_system');
+    }
 }
 
-// CORREÇÃO: Tabela amarrada para exibir "Nota" e "Enviar" para caixas normais e fiados
 function renderizarTabela() {
     const tbody = document.querySelector('#tabelaDados tbody'); tbody.innerHTML = '';
     registros.forEach(reg => {
@@ -359,8 +367,6 @@ function renderizarTabela() {
         const valorExibido = reg.tipo === 'credito' ? (reg.corrida + reg.emprestado) : reg.corrida;
         
         let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="emititNotaFiscalWhatsApp(${reg.id})">🧾 Nota</button>`;
-        
-        // Botão móvel integrado
         acoesHtml += `<button class="btn-whats" style="background:#25d366; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="revierComprovanteWhats(${reg.id})">📱 Enviar</button>`;
         
         if (localStorage.getItem('driverflux_modo_demo') !== 'true') {
@@ -385,6 +391,10 @@ function realizarLogin() {
             else { alert("❌ Senha incorreta!"); }
         } else { alert("❌ Usuário não cadastrado!"); }
     });
+}
+
+function手efetuarLogout() {
+    // Função mantida vazia se existia originalmente por redundância de clique
 }
 
 function efetuarLogout() {
@@ -474,7 +484,6 @@ function garantirUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (sn
 function ajustarCamposPorModalidade() { const tipo = document.getElementById('inputTipoLancamento').value; document.getElementById('camposCreditoOpcionais').style.display = (tipo === 'credito') ? 'block' : 'none'; }
 function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
 
-// CORREÇÃO: Diferencia o clique de Inclusão (id null abre na demo) do clique de Alteração de registros salvos
 function abrirModalEdicao(id) { 
     if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) {
         alert("🔒 Edição de registros bloqueada no modo de demonstração.");
@@ -501,7 +510,6 @@ function abrirModalEdicao(id) {
     ajustarCamposPorModalidade(); document.getElementById('formModal').style.display = 'flex'; 
 }
 
-// NOVA FUNÇÃO: Injeta novos motoristas reais e senhas direto na nuvem do seu Firebase
 function cadastrarNovoMotoristaMaster() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         return alert("🔒 Cadastro de motoristas bloqueado no modo de demonstração.");
