@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Teste e Persistência Unificada Direta em salvarDados
+ * Lógica de Negócio Completa com Atalhos de Teste e Persistência Unificada Direta
  */
 
 const firebaseConfig = {
@@ -169,7 +169,6 @@ function capturarGpsAntecipadoEAtualizarVisor() {
     }
 }
 
-// SOLUÇÃO UNIFICADA: Salva diretamente sem dependências assíncronas no momento do clique
 function salvarDados() {
     const tipo = document.getElementById('inputTipoLancamento').value;
     const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
