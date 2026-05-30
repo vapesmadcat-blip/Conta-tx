@@ -1,8 +1,17 @@
 /**
- * APP.JS - Lógica Oficial DriverFlux
- * Desenvolvido por: João Kersting
- * Segurança: Criptografia por Primos Elevados e Travas Físicas de Turno
+ * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
+ * Integrado com Cadastro de Motoristas Master e Envio de Comprovantes via WhatsApp
  */
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAY217DxZeZZMlg0ZpHYFvXoALrkd5zcPM",
+    authDomain: "driverflux.firebaseapp.com",
+    databaseURL: "https://driverflux-default-rtdb.firebaseio.com",
+    projectId: "driverflux",
+    storageBucket: "driverflux.firebasestorage.app",
+    messagingSenderId: "855577761510",
+    appId: "1:855577761510:web:7e4c0911921a5c18c34d27"
+};
 
 let db = null;
 function iniciarFirebaseSeNecessario() {
@@ -15,6 +24,7 @@ function iniciarFirebaseSeNecessario() {
 let turnosHistoricoMaster = {}; 
 let registros = [];             
 let pagamentos = [];            
+let coordenadaAtual = null;
 let filtroTexto = "";
 let usuarioLogado = "";         
 let idTurnoAtivo = "";          
@@ -23,7 +33,7 @@ let motoristasCadastroMaster = {};
 
 const LIMITE_DEMO = 10;
 
-// BLINDAGEM DE CONTRA-SENHAS (Multiplicadores Ímpares > 7 e Somas Sem Padrão)
+// BLINDAGEM DE CONTRA-SENHAS (Multiplicadores Primos Ímpares > 7)
 function obterSenhaDefinitiva(desafio) { return (parseInt(desafio) * 13) + 6182; }
 function obterSenhaDemo(desafio) { return (parseInt(desafio) * 11) + 3947; }
 
@@ -52,7 +62,7 @@ function verificarAtivacao() {
     if (!digitada) return alert("⚠️ Digite a contra-senha.");
 
     if (digitada === obterSenhaDefinitiva(desafio)) {
-        ativarVersaoCompletaDefinitiva();
+        ativarVersãoCompletaDefinitiva();
     } else if (digitada === obterSenhaDemo(desafio)) {
         if (localStorage.getItem('driverflux_demo_ja_utilizada') === 'true') {
             alert("❌ Bloqueado! Este dispositivo já utilizou o período de demonstração. Insira a contra-senha de liberação definitiva.");
@@ -67,6 +77,11 @@ function verificarAtivacao() {
 }
 
 function activarVersaoCompletaDefinitiva() {
+    // Mantido por compatibilidade de chamada
+    ativarVersãoCompletaDefinitiva();
+}
+
+function ativarVersãoCompletaDefinitiva() {
     localStorage.setItem('driverflux_licenca_ativa', 'true');
     localStorage.setItem('driverflux_modo_demo', 'false');
     localStorage.setItem('driverflux_demo_ja_utilizada', 'true');
@@ -82,10 +97,10 @@ function activarVersaoCompletaDefinitiva() {
             corridasParaMigrar.forEach(reg => {
                 migracaoRef.push({
                     id: reg.id, tipo: reg.tipo, cliente: reg.cliente + " (Vindo da Demo)",
-                    emprestado: reg.emprestado || 0, corrida: reg.corrida, dataHora: reg.dataHora || "Data Demo"
+                    emprestado: reg.emprestado || 0, corrida: reg.corrida, dataHora: reg.dataHora || "Data Demo", gps: null
                 });
             });
-            alert("📦 Sucesso! Suas corridas da demo foram migradas para a nuvem!");
+            alert("📦 Sucesso! Corridas registradas na demo foram migradas para a nuvem!");
         }
     }
     alert("🚀 Sistema COMPLETO liberado!");
@@ -183,7 +198,7 @@ function abrirTurnoOperacional() {
 }
 
 function encerrarTurnoDefinitivo() {
-    let kmFinal = prompt("🚗 Para fechar o caixa, insira a QUILOMETRAGEM FINAL do painel:");
+    let kmFinal = prompt("🚗 Para fechar o caixa, insira a QUILOMETRAGEM FINAL (Hodômetro):");
     if (!kmFinal) return alert("⚠️ Encerramento cancelado. É obrigatório informar a KM Final.");
     kmFinal = parseInt(kmFinal);
     
@@ -195,7 +210,7 @@ function encerrarTurnoDefinitivo() {
     
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         localStorage.setItem('driverflux_demo_status', 'fechado');
-        alert(`Caixa encerrado com sucesso!\nKM total rodada no turno: ${kmFinal - kmInicialVal} KM.`);
+        alert(`Caixa encerrado!\nDistância Rodada: ${kmFinal - kmInicialVal} KM.`);
         verificarStatusTurnoMotorista();
         return;
     }
@@ -204,7 +219,7 @@ function encerrarTurnoDefinitivo() {
     db.ref(`turnos_operacionais/${usuarioLogado}/${idTurnoAtivo}`).update({ 
         status: "fechado", fechamento: dataStr, kmFinal: kmFinal, kmTotalRodado: (kmFinal - kmInicialVal)
     }).then(() => {
-        alert("🔴 Turno encerrado com sucesso!");
+        alert("🔴 Turno encerrado e enviado para auditoria Master!");
         efetuarLogoutPronto();
     });
 }
@@ -234,11 +249,11 @@ function renderToggleAcoesDemo() {
     if (!document.getElementById('badgeAvisoContador')) {
         let div = document.createElement('div'); div.id = "badgeAvisoContador";
         div.style.cssText = "background:#fffbeb; color:#b45309; font-size:11px; padding:8px; border-radius:8px; text-align:center; width:100%; margin-bottom:10px; font-weight:bold; cursor:pointer;";
-        div.innerText = `📈 Limite Demo: ${registros.length} de ${LIMITE_DEMO} registros. (Clique aqui para Ativar a Licença)`;
+        div.innerText = `📈 Limite Demo: ${registros.length} de ${LIMITE_DEMO} registros. (Clique aqui para Ativar)`;
         div.onclick = function() {
             let senhaUpgrade = prompt("🔑 Insira a Contra-Senha de Liberação Definitiva:");
             if (senhaUpgrade && parseInt(senhaUpgrade) === obterSenhaDefinitiva(localStorage.getItem('driverflux_codigo_desafio'))) {
-                activarVersaoCompletaDefinitiva();
+                ativarVersãoCompletaDefinitiva();
             } else if (senhaUpgrade) { alert("❌ Contra-senha inválida!"); }
         };
         document.getElementById('conteudoApp').insertBefore(div, document.getElementById('conteudoApp').firstChild);
@@ -263,7 +278,7 @@ function salvarDados() {
 
     const novaCorrida = {
         id: registros.length > 0 ? Math.max(...registros.map(r => r.id)) + 1 : 1, 
-        tipo: tipo, cliente: nomeCliente, emprestado: vEmprestimo, corrida: vCorrida, dataHora: dataHoraStr
+        tipo: tipo, cliente: nomeCliente, emprestado: vEmprestimo, corrida: vCorrida, dataHora: dataHoraStr, gps: coordenadaAtual
     };
 
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
@@ -286,13 +301,13 @@ function finalizarLancamentoCorrida(tipo, cliente, corrida, emprestimo, dataHora
 
     if (tipo === 'credito') {
         const totalDevido = corrida + (emprestimo * 1.20);
-        let txt = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${dataHora}\n👤 *Cliente:* ${cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${emprestimo.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n\n_Sumário de cobrança ativo lançado._`;
+        let txt = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${dataHora}\n👤 *Cliente:* ${cliente.toUpperCase()}\n-----------------------------------------\n🚕 *Corrida:* R$ ${corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${emprestimo.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n\n_Sumário de cobrança ativo lançado._`;
         let url = whatsapp ? `https://api.whatsapp.com/send?phone=55${whatsapp}&text=${encodeURIComponent(txt)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(txt)}`;
         window.open(url, '_system');
     }
 }
 
-function emitirNotaFiscalWhatsApp(idCorrida) {
+function emititNotaFiscalWhatsApp(idCorrida) {
     const reg = registros.find(r => r.id === idCorrida);
     if (!reg) return alert("Corrida não encontrada.");
 
@@ -319,19 +334,40 @@ function emitirNotaFiscalWhatsApp(idCorrida) {
     window.open(urlWhats, '_system');
 }
 
+// CORREÇÃO: Função adicionada para re-enviar o recibo detalhado a qualquer momento
+function revierComprovanteWhats(idCorrida) {
+    const reg = registros.find(r => r.id === idCorrida);
+    if (!reg) return alert("Corrida não encontrada.");
+    
+    let whatsapp = prompt("📱 Digite o WhatsApp para envio (Com DDD, apenas números):", "51");
+    if (!whatsapp) return;
+
+    const totalDevido = reg.corrida + ((reg.emprestado || 0) * 1.20);
+    let txt = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${(reg.emprestado || 0).toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}`;
+    
+    let url = `https://api.whatsapp.com/send?phone=55${whatsapp}&text=${encodeURIComponent(txt)}`;
+    window.open(url, '_system');
+}
+
+// CORREÇÃO: Tabela amarrada para exibir "Nota" e "Enviar" para caixas normais e fiados
 function renderizarTabela() {
     const tbody = document.querySelector('#tabelaDados tbody'); tbody.innerHTML = '';
     registros.forEach(reg => {
         const tr = document.createElement('tr');
+        const descTipo = reg.tipo === 'credito' ? '🟡 Crédito' : '🟢 Normal';
         const descCliente = reg.tipo === 'credito' ? (reg.cliente || 'N/I') : 'Passageiro Balcão';
         const valorExibido = reg.tipo === 'credito' ? (reg.corrida + reg.emprestado) : reg.corrida;
         
-        let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:5px 8px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="emitirNotaFiscalWhatsApp(${reg.id})">🧾 Nota</button>`;
+        let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="emititNotaFiscalWhatsApp(${reg.id})">🧾 Nota</button>`;
+        
+        // Botão móvel integrado
+        acoesHtml += `<button class="btn-whats" style="background:#25d366; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="revierComprovanteWhats(${reg.id})">📱 Enviar</button>`;
+        
         if (localStorage.getItem('driverflux_modo_demo') !== 'true') {
-            acoesHtml += `<button class="btn-cancel" style="padding:5px 6px; font-size:11px;" onclick="abrirModalEdicao(${reg.id})">Editar</button>`;
+            acoesHtml += `<button class="btn-cancel" style="padding:4px 6px; font-size:11px;" onclick="abrirModalEdicao(${reg.id})">Editar</button>`;
         } else { acoesHtml += `🔒 Local`; }
 
-        tr.innerHTML = `<td>#${reg.id}</td><td>${reg.tipo === 'credito' ? '🟡 Fiado' : '🟢 Caixa'}</td><td>${descCliente}</td><td style="font-weight:bold;">${formatarMoeda(valorExibido)}</td><td>${acoesHtml}</td>`;
+        tr.innerHTML = `<td>#${reg.id}</td><td>${descTipo}</td><td>${descCliente}</td><td style="font-weight:bold;">${formatarMoeda(valorExibido)}</td><td>${acoesHtml}</td>`;
         tbody.appendChild(tr);
     });
 }
@@ -353,8 +389,7 @@ function realizarLogin() {
 
 function efetuarLogout() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        alert("ℹ️ No modo de demonstração, seus dados estão salvos localmente. Para fechar o aplicativo, basta fechar a janela no seu celular.");
-        return;
+        alert("ℹ️ Dados salvos localmente no celular da demo."); return;
     }
     if (confirm("🚪 Deseja realmente sair do perfil?")) {
         efetuarLogoutPronto();
@@ -439,15 +474,14 @@ function garantirUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (sn
 function ajustarCamposPorModalidade() { const tipo = document.getElementById('inputTipoLancamento').value; document.getElementById('camposCreditoOpcionais').style.display = (tipo === 'credito') ? 'block' : 'none'; }
 function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
 
+// CORREÇÃO: Diferencia o clique de Inclusão (id null abre na demo) do clique de Alteração de registros salvos
 function abrirModalEdicao(id) { 
-    // Se for modo demo e o cara tentar EDITAR uma corrida existente (id válido), aí sim bloqueia
-    if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null && id !== "") {
+    if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) {
         alert("🔒 Edição de registros bloqueada no modo de demonstração.");
-        return; 
+        return;
     }
     
-    // Se o id for null ou vazio, significa que é uma NOVA corrida (Inclusão)
-    if (id === null || id === "") {
+    if (id === null) {
         document.getElementById('modalTitle').innerText = `Lançar Corrida`;
         document.getElementById('editId').value = "";
         document.getElementById('inputTipoLancamento').value = "normal";
@@ -456,9 +490,7 @@ function abrirModalEdicao(id) {
         document.getElementById('inputWhatsCliente').value = "";
         document.getElementById('inputEmprestimo').value = 0;
     } else {
-        // Se for modo completo, permite carregar os dados para editar
-        const reg = registros.find(r => r.id === id); 
-        if (!reg) return;
+        const reg = registros.find(r => r.id === id); if (!reg) return;
         document.getElementById('modalTitle').innerText = `Alterar Registro #${id}`;
         document.getElementById('editId').value = id;
         document.getElementById('inputTipoLancamento').value = reg.tipo || "normal";
@@ -466,11 +498,35 @@ function abrirModalEdicao(id) {
         document.getElementById('inputCliente').value = reg.cliente || "";
         document.getElementById('inputEmprestimo').value = reg.emprestado || 0;
     }
-    
-    ajustarCamposPorModalidade(); 
-    document.getElementById('formModal').style.display = 'flex'; 
+    ajustarCamposPorModalidade(); document.getElementById('formModal').style.display = 'flex'; 
 }
 
+// NOVA FUNÇÃO: Injeta novos motoristas reais e senhas direto na nuvem do seu Firebase
+function cadastrarNovoMotoristaMaster() {
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        return alert("🔒 Cadastro de motoristas bloqueado no modo de demonstração.");
+    }
+    
+    let novoUser = prompt("👤 Digite o IDENTIFICADOR do novo motorista (Tudo junto, minúsculo. Ex: joao, carlos):");
+    if (!novoUser) return;
+    novoUser = novoUser.trim().toLowerCase();
+    
+    let novaSenha = prompt(`🔑 Digite a senha de acesso para o motorista [${novoUser}]:`);
+    if (!novaSenha) return;
+    
+    let tipoContrato = prompt("📋 Digite o tipo de contrato (Digite exatamente: efetivo ou folguista):", "efetivo");
+    if (!tipoContrato) return;
+    tipoContrato = tipoContrato.trim().toLowerCase();
+
+    iniciarFirebaseSeNecessario();
+    db.ref(`usuarios/${novoUser}`).set({
+        senha: novaSenha,
+        tipo: tipoContrato
+    }).then(() => {
+        alert(`🚀 Motorista [${novoUser.toUpperCase()}] cadastrado com sucesso no Firebase!`);
+        inicializarMaster();
+    });
+}
 
 function inicializarMaster() { db.ref("usuarios").once("value", (snapshotUser) => { motoristasCadastroMaster = snapshotUser.val() || {}; db.ref("turnos_operacionais").on("value", (snapshot) => { const data = snapshot.val(); const select = document.getElementById('selectFiltroTurnoMaster'); select.innerHTML = '<option value="">-- Escolha um Turno / Caixa para Auditar --</option>'; turnosHistoricoMaster = {}; if (data) { Object.keys(data).forEach(motorista => { Object.keys(data[motorista]).forEach(turnoId => { const t = data[motorista][turnoId]; turnosHistoricoMaster[turnoId] = t; let mInfo = motoristasCadastroMaster[motorista]; let tContrato = (mInfo && mInfo.tipo) ? mInfo.tipo : (t.tipoContrato || "efetivo"); const opt = document.createElement('option'); opt.value = turnoId; const statusIcon = t.status === 'aberto' ? '🟢 (Ativo)' : '🔴 (Fechado)'; opt.innerText = `${statusIcon} ${t.motorista.toUpperCase()} [${tContrato.toUpperCase()}] | Início: ${t.abertura}`; select.appendChild(opt); }); }); } }); }); }
 function selecionarTurnoParaVerificacaoMaster() { const selectedId = document.getElementById('selectFiltroTurnoMaster').value; document.getElementById('cardTotais').style.display = 'none'; document.getElementById('cardRelatorio').style.display = 'none'; if (!selectedId) { registros = []; renderizarTabela(); document.getElementById('lblIdTurnoAtivo').innerText = "Turno: Nenhum selecionado"; return; } metadadosTurno = turnosHistoricoMaster[selectedId]; idTurnoAtivo = selectedId; let contratoLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO"; document.getElementById('lblIdTurnoAtivo').innerText = `Auditoria Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()} | Tipo: ${contratoLog}`; db.ref(`corridas_por_turno/${selectedId}`).once("value", (snapshot) => { registros = []; const data = snapshot.val(); if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); } renderizarTabela(); }); }
