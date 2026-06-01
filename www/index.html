@@ -24,14 +24,14 @@
         .card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
         .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--texto); text-transform: uppercase; }
         
-        .code-display { background: #edf2f7; border: 2px dashed var(--primary); padding: 15px; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-align: center; border-radius: 12px; margin: 20px 0; }
+        .code-display { background: #edf2f7; border: 2px dashed var(--primary); padding: 15px; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-align: center; border-radius: 12px; margin: [...]
         
         header { text-align: center; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         header h1 { font-size: 24px; font-weight: 800; color: var(--primary); }
         .user-badge { background: #e0e7ff; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; margin-top: 4px; }
 
         .btn-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-        button { border: none; padding: 12px 8px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease; }
+        button { border: none; padding: 12px 8px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transi[...]
         button:active { transform: scale(0.97); }
 
         .btn-incluir { background: var(--primary); color: white; }
@@ -64,16 +64,19 @@
         .danger-text { color: var(--danger); font-weight: 600; }
         .success-text { color: var(--success); font-weight: 600; }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z[...]
         .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 400px; box-shadow: var(--shadow); }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         
         .report-output { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: none; }
+
+        .error-banner { background: #fee2e2; border-left: 4px solid var(--danger); padding: 12px; border-radius: 8px; color: #991b1b; margin-bottom: 16px; display: none; font-weight: 600; }
     </style>
 </head>
 <body>
 
 <div class="container-central">
+    <div class="error-banner" id="errorBanner"></div>
 
     <div id="telaAtivacao" class="card" style="display: none; text-align: center;">
         <h2>Ativação do Sistema</h2>
@@ -236,13 +239,86 @@
     </div>
 </div>
 
+<!-- Fallback para Cordova se não estiver disponível -->
+<script>
+    if (typeof cordova === 'undefined') {
+        console.warn('⚠️ Cordova não detectado - Modo Web/Browser');
+        window.cordova = { plugins: {} };
+    }
+</script>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="cordova.js"></script>
 
+<!-- Módulos customizados -->
 <script src="js/geolocation.js"></script>
 <script src="js/app.js"></script>
 
+<!-- Cordova (carrega do dispositivo se disponível) -->
+<script src="cordova.js"></script>
+
+<script>
+    console.log('📱 DriverFlux - Inicializando aplicação...');
+    
+    // Verificar se o DOM está pronto
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', inicializar);
+    } else {
+        inicializar();
+    }
+
+    function inicializar() {
+        console.log('✅ DOM pronto');
+        
+        // Verificar elementos HTML críticos
+        const elementosCriticos = ['telaAtivacao', 'telaLogin', 'formModal', 'conteudoApp'];
+        const todosPresentes = elementosCriticos.every(id => document.getElementById(id));
+        
+        if (!todosPresentes) {
+            console.error('❌ Elementos HTML não encontrados');
+            exibirErro('Erro ao carregar interface. Elementos faltando.');
+            return;
+        }
+        
+        // Inicializar geolocalização
+        if (typeof GeoLocation !== 'undefined') {
+            GeoLocation.init();
+            console.log('✅ Geolocalização disponível');
+        } else {
+            console.warn('⚠️ Módulo GeoLocation não disponível');
+        }
+        
+        // Verificar Firebase
+        if (typeof firebase === 'undefined') {
+            console.warn('⚠️ Firebase não carregou ainda');
+        } else {
+            console.log('✅ Firebase disponível');
+        }
+        
+        console.log('🚀 Aplicação pronta para uso');
+    }
+
+    function exibirErro(mensagem) {
+        const banner = document.getElementById('errorBanner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.innerText = '❌ ' + mensagem;
+        }
+        console.error('Erro exibido:', mensagem);
+    }
+
+    // Tratamento de erros global
+    window.addEventListener('error', function(event) {
+        console.error('❌ Erro detectado:', event.error);
+        exibirErro('Erro ao executar. Verifique o console.');
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('❌ Promise rejected:', event.reason);
+        exibirErro('Erro ao processar requisição.');
+    });
+</script>
+
 </body>
 </html>
-
