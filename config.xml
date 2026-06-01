@@ -13,9 +13,9 @@
     </plugin>
     
     <!-- Ícone da Aplicação -->
-    <icon src="res/icon.png" width="192" height="192" />
+    <icon src="res/icon/android/icon.png" width="192" height="192" />
     
     <!-- Splash Screen -->
-    <splash src="res/splash.png" width="320" height="480" />
+    <splash src="res/screen/android/splash.png" width="320" height="480" />
     
 </widget>
