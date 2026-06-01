@@ -670,18 +670,148 @@ function encerrarTurnoDefinitivo() {
 function processarConsultaCliente() {
     const nome = document.getElementById('inputPesquisa').value.trim();
     const ficha = document.getElementById('fichaCliente');
-    if (!nome || !ficha) { if(ficha) ficha.style.display = 'none'; return; }
+    if (!nome || !ficha) { 
+        if(ficha) ficha.style.display = 'none'; 
+        return; 
+    }
     
-    const corridas = registros.filter(r => r.tipo === 'credito' && r.cliente.toLowerCase() === nome.toLowerCase());
-    const totalDevido = corridas.reduce((acc, curr) => acc + curr.corrida + (curr.emprestado * 1.20), 0);
+    const corridas = registros.filter(r => r.tipo === 'credito' && r.cliente && r.cliente.toLowerCase() === nome.toLowerCase());
+    let totalDevido = corridas.reduce((acc, curr) => acc + curr.corrida + ((curr.emprestado || 0) * 1.20), 0);
     
-    document.getElementById('ledgerNomeCliente').innerText = `Extrato: ${nome.toUpperCase()}`;
+    // Carregar pagamentos
+    carregarPagamentos();
+    const totalPago = calcularTotalPagoPorCliente(nome);
+    
+    const saldoPendente = Math.max(0, totalDevido - totalPago);
+
+    document.getElementById('ledgerNomeCliente').innerText = `📋 Extrato: ${nome.toUpperCase()}`;
     document.getElementById('ledgerTotalDevido').innerText = formatarMoeda(totalDevido);
-    document.getElementById('ledgerSaldoFinal').innerText = formatarMoeda(totalDevido);
+    document.getElementById('ledgerTotalPago').innerText = formatarMoeda(totalPago);
+    document.getElementById('ledgerSaldoFinal').innerText = formatarMoeda(saldoPendente);
     ficha.style.display = 'block';
 }
 
-function limparConsulta() { document.getElementById('inputPesquisa').value = ''; processarConsultaCliente(); }
-function registrarPagamento() { alert("Funcionalidade de amortização em desenvolvimento."); }
+function calcularTotalPagoPorCliente(nomeCliente) {
+    return pagamentos.filter(p => p.cliente && p.cliente.toLowerCase() === nomeCliente.toLowerCase())
+                    .reduce((acc, p) => acc + (parseFloat(p.valor) || 0), 0);
+}
 
-window.onload = () => { checarLicenciamento(); };
+function carregarPagamentos() {
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        const salvo = localStorage.getItem('driverflux_demo_pagamentos');
+        pagamentos = salvo ? JSON.parse(salvo) : [];
+    } else if (db) {
+        // Firebase load would be more complex, but for now we use in-memory + demo
+        // In real use, you would listen to changes
+    }
+}
+
+function salvarPagamento(novoPagamento) {
+    pagamentos.push(novoPagamento);
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        localStorage.setItem('driverflux_demo_pagamentos', JSON.stringify(pagamentos));
+    } else if (db && idTurnoAtivo) {
+        db.ref(`pagamentos/${usuarioLogado}/${idTurnoAtivo}`).push(novoPagamento);
+    }
+    processarConsultaCliente(); // Atualiza extrato
+}
+
+function registrarPagamento() {
+    const nome = document.getElementById('inputPesquisa').value.trim();
+    const valorInput = document.getElementById('inputValorPagamento');
+    const valor = parseFloat(valorInput ? valorInput.value : 0) || 0;
+
+    if (!nome) {
+        alert("⚠️ Busque um cliente primeiro.");
+        return;
+    }
+    if (valor <= 0) {
+        alert("⚠️ Digite um valor positivo para amortizar.");
+        return;
+    }
+
+    const agora = new Date();
+    const dataHora = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
+    const pagamento = {
+        cliente: nome,
+        valor: valor,
+        dataHora: dataHora,
+        turno: idTurnoAtivo || "DEMO",
+        operador: usuarioLogado || "demo"
+    };
+
+    salvarPagamento(pagamento);
+
+    alert(`✅ Amortização de R$ ${valor.toFixed(2)} registrada para ${nome}!\n\nSaldo atualizado.`);
+
+    // Limpa o campo de valor
+    if (valorInput) valorInput.value = "";
+
+    // Envia recibo simples via WhatsApp se quiser
+    if (confirm("Enviar comprovante de pagamento via WhatsApp?")) {
+        const msg = `🧾 *COMPROVANTE DE PAGAMENTO - DRIVERFLUX*\nCliente: ${nome}\nValor Pago: R$ ${valor.toFixed(2)}\nData: ${dataHora}\nObrigado!`;
+        const destino = prompt("WhatsApp (com DDD):", "51");
+        if (destino && destino.length > 8) {
+            window.location.href = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(msg)}`;
+        }
+    }
+
+    processarConsultaCliente();
+}
+
+function limparConsulta() { 
+    document.getElementById('inputPesquisa').value = ''; 
+    document.getElementById('inputValorPagamento').value = '';
+    const ficha = document.getElementById('fichaCliente');
+    if(ficha) ficha.style.display = 'none';
+}
+
+// Melhorias no relatório com filtro simples de período (demo)
+function gerarRelatorio() {
+    let tNormais = 0, tCredito = 0, tEmprestado = 0;
+    registros.forEach(r => { 
+        if (r.tipo === 'credito') { 
+            tCredito += r.corrida; 
+            tEmprestado += r.emprestado || 0; 
+        } else { 
+            tNormais += r.corrida; 
+        } 
+    });
+    
+    carregarPagamentos();
+    let totalAmortizadoGeral = pagamentos.reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
+
+    let fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
+    let totalCarro = fundo + tNormais + totalAmortizadoGeral;
+    let pfxAtivo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
+
+    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA + AMORTIZAÇÕES\n=========================================\n`;
+    txt += `🚖 PREFIXO: ${pfxAtivo} | 👤 ${usuarioLogado.toUpperCase()}\n📅 ${new Date().toLocaleDateString('pt-BR')}\n=========================================\n\n`;
+    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n`;
+    txt += `(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n`;
+    txt += `(+) Corridas no Crédito: ${formatarMoeda(tCredito)}\n`;
+    txt += `(+) Amortizações Recebidas: ${formatarMoeda(totalAmortizadoGeral)}\n`;
+    txt += `(=) TOTAL CAIXA + RECEBIMENTOS: ${formatarMoeda(totalCarro)}\n\n`;
+    txt += `💰 Dica: Use "Clientes / Pgto" para amortizar fiados individualmente.\n`;
+
+    let imprimir = confirm(`📊 FECHAMENTO COMPLETO:\n\n${txt}\n\nImprimir agora?`);
+    if (imprimir) {
+        const output = document.getElementById('reportOutput');
+        const card = document.getElementById('cardRelatorio');
+        if(output && card) { 
+            output.innerText = txt; 
+            card.style.display = 'block'; 
+        }
+        window.print();
+    }
+}
+
+window.onload = () => { 
+    checarLicenciamento(); 
+    // Garante que pagamentos sejam inicializados
+    setTimeout(() => {
+        if (typeof pagamentos === 'undefined') pagamentos = [];
+        carregarPagamentos();
+    }, 800);
+};
