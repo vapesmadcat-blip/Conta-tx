@@ -377,28 +377,29 @@ async function salvarDados() {
 }
 
 function finalizarSalvamento(dados, whats) {
-    fecharModal(); renderizarTabela(); atualizarListaSugestoes();
+    fecharModal(); 
+    renderizarTabela(); 
+    atualizarListaSugestoes();
     if (localStorage.getItem('driverflux_modo_demo') === 'true') { renderToggleAcoesDemo(); }
-    if (dados.tipo === 'credito') { prepararDisparoReciboNativo(dados, whats); }
+    
+    // Se for crédito, oferecer envio de recibo (opcional)
+    if (dados.tipo === 'credito') { 
+        ofererecerEnvioRecibo(dados, whats); 
+    }
 }
 
-function prepararDisparoReciboNativo(reg, whatsappSugerido) {
+function ofererecerEnvioRecibo(reg, whatsappSugerido) {
     let txtMensagem = "";
     let localizacaoGps = reg.gps || "Não capturado";
     let pfxRecibo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
 
-    if (reg.tipo === 'credito') {
-        const totalDevido = reg.corrida + (reg.emprestado * 1.20);
-        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* [...]
-    } else {
-        let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
-        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefi[...]
-    }
+    const totalDevido = reg.corrida + (reg.emprestado * 1.20);
+    txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente}\n💰 *Valor Corrida:* ${formatarMoeda(reg.corrida)}\n💸 *Empréstimo:* ${formatarMoeda(reg.emprestado)}\n📊 *Total Devido (+20%):* ${formatarMoeda(totalDevido)}\n📍 *Localização:* ${localizacaoGps}`;
 
-    let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
+    let confirmarEnvio = confirm(`📄 RECIBO REGISTRADO!\n\n${txtMensagem.replace(/\*/g, '')}\n\n✅ Corrida salva no histórico!\n\nDeseja enviar este comprovante via WhatsApp?`);
     if (confirmarEnvio) {
-        let destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", whatsappSugerido || "51");
-        if (!destino || destino === "51") return alert("⚠️ Operação cancelada. Número inválido.");
+        let destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", whatsappSugerido || "");
+        if (!destino || destino.length < 10) return alert("⚠️ Número inválido. Recibo mantém-se no histórico.");
         let urlWhats = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
         window.location.href = urlWhats;
     }
@@ -407,13 +408,30 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
 function emititNotaFiscalWhatsApp(idCorrida) {
     const reg = registros.find(r => r.id === idCorrida);
     if (!reg) return alert("Corrida não encontrada.");
-    prepararDisparoReciboNativo(reg, "51");
+    
+    let txtMensagem = "";
+    let localizacaoGps = reg.gps || "Não capturado";
+    let pfxRecibo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
+
+    if (reg.tipo === 'credito') {
+        const totalDevido = reg.corrida + (reg.emprestado * 1.20);
+        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente}\n💰 *Valor Corrida:* ${formatarMoeda(reg.corrida)}\n💸 *Empréstimo:* ${formatarMoeda(reg.emprestado)}\n📊 *Total Devido (+20%):* ${formatarMoeda(totalDevido)}\n📍 *Localização:* ${localizacaoGps}`;
+    } else {
+        let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
+        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n👤 *CLIENTE:* ${descCliente}\n💰 *VALOR CORRIDA:* ${formatarMoeda(reg.corrida)}\n📍 *LOCAL:* ${localizacaoGps}\n📅 *DATA/HORA:* ${reg.dataHora}`;
+    }
+
+    let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
+    if (confirmarEnvio) {
+        let destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", reg.whatsCliente || "51");
+        if (!destino || destino === "51") return alert("⚠️ Operação cancelada.");
+        let urlWhats = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
+        window.location.href = urlWhats;
+    }
 }
 
 function revierComprovanteWhats(idCorrida) {
-    const reg = registros.find(r => r.id === idCorrida);
-    if (!reg) return alert("Corrida não encontrada.");
-    prepararDisparoReciboNativo(reg, reg.whatsCliente || "51");
+    emititNotaFiscalWhatsApp(idCorrida);
 }
 
 function renderizarTabela() {
@@ -426,8 +444,8 @@ function renderizarTabela() {
         const descCliente = reg.tipo === 'credito' ? (reg.cliente || 'N/I') : 'Passageiro Balcão';
         const valorExibido = reg.tipo === 'credito' ? (reg.corrida + reg.emprestado) : reg.corrida;
         
-        let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onc[...]
-        acoesHtml += `<button class="btn-whats" style="background:#25d366; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" oncli[...]
+        let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="emititNotaFiscalWhatsApp(${reg.id})">📄 Nota</button>`;
+        acoesHtml += `<button class="btn-whats" style="background:#25d366; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="revierComprovanteWhats(${reg.id})">💬 WhatsApp</button>`;
         
         if (localStorage.getItem('driverflux_modo_demo') !== 'true') {
             acoesHtml += `<button class="btn-cancel" style="padding:4px 6px; font-size:11px;" onclick="abrirModalEdicao(${reg.id})">Editar</button>`;
@@ -590,7 +608,7 @@ function gerarRelatorio() {
 
     let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n=========================================\n`;
     txt += `🚖 VEÍCULO / PREFIXO AUDITADO: ${pfxAtivo}\n👤 MOTORISTA / OPERADOR: ${usuarioLogado.toUpperCase()}\n=========================================\n\n`;
-    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n(+) Auxílio Emprestado: ${form[...]
+    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n`;
     txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n=========================================\n`;
 
     let imprimir = confirm(`📄 FECHAMENTO DE TURNO:\n\n${txt}\n\nDeseja abrir a janela de impressão do sistema?`);
