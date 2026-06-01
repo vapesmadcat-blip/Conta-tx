@@ -208,6 +208,7 @@ function abrirModalEdicao(id) {
 }
 
 function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
+function fecharCard(id) { document.getElementById(id).style.display = 'none'; window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
 function ajustarCamposPorModalidade() {
     const tipo = document.getElementById('inputTipoLancamento').value;
@@ -416,10 +417,18 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
         txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n👤 *CLIENTE:* ${descCliente}\n💰 *VALOR DA CORRIDA:* R$ ${reg.corrida.toFixed(2)}\n📅 *DATA/HORA:* ${reg.dataHora}\n📍 *LOCALIZAÇÃO GPS:* ${localizacaoGps}\n=========================================\nObrigado pela preferência!`;
     }
 
+    // Se não tiver WhatsApp sugerido e for crédito, não pergunta nada e encerra o fluxo (salvamento fluido)
+    if (!whatsappSugerido && reg.tipo === 'credito') return;
+
     let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
     if (confirmarEnvio) {
-        let destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", whatsappSugerido || "51");
-        if (!destino || destino === "51") return alert("⚠️ Operação cancelada. Número inválido.");
+        let destino = whatsappSugerido;
+        if (!destino || destino === "51") {
+            destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", "51");
+        }
+        
+        if (!destino || destino === "51" || destino.length < 10) return alert("⚠️ Operação cancelada ou número inválido.");
+        
         let urlWhats = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
         window.location.href = urlWhats;
     }
