@@ -184,12 +184,14 @@
             <div class="result-row total-final"><span>Dinheiro Vivo Esperado:</span> <span id="totGeral">R$ 0,00</span></div>
             
             <button class="btn-danger" id="btnFecharTurnoOficial" style="width:100%; margin-top:15px; padding:12px;" onclick="encerrarTurnoDefinitivo()">🔴 Encerrar Turno e Fechar Caixa</button>
+            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardTotais')">Voltar / Cancelar</button>
         </div>
 
         <div class="card" id="cardRelatorio" style="display: none;">
             <h2>Relatório de Turno</h2>
             <div class="report-output" id="reportOutput"></div>
             <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir Fechamento</button>
+            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardRelatorio')">Voltar ao Menu</button>
         </div>
     </div>
 </div>
