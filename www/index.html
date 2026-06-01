@@ -82,7 +82,7 @@
             <label>Digite a Contra-Senha</label>
             <input type="number" id="inputContraSenha" placeholder="Código de liberação">
         </div>
-        <button id="btnAtivar" class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
+        <button class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
     </div>
 
     <div id="telaLogin" class="card" style="display: none;">
@@ -95,7 +95,7 @@
             <label>Senha de Acesso</label>
             <input type="password" id="loginSenha" placeholder="******">
         </div>
-        <button id="btnLogin" class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
+        <button class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
     </div>
 
     <div id="telaAberturaTurno" class="card" style="display: none;">
@@ -108,7 +108,7 @@
             <label>🚗 Hodômetro Inicial (KM Atual do Painel)</label>
             <input type="number" id="inputKmInicial" placeholder="Ex: 142350">
         </div>
-        <button id="btnAbrirTurno" class="btn-incluir" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px;" onclick="abrirTurnoOperacional()">Iniciar Trabalho</button>
+        <button class="btn-incluir" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px;" onclick="abrirTurnoOperacional()">Iniciar Trabalho</button>
     </div>
 
     <div id="conteudoApp" style="display: none;">
@@ -184,14 +184,12 @@
             <div class="result-row total-final"><span>Dinheiro Vivo Esperado:</span> <span id="totGeral">R$ 0,00</span></div>
             
             <button class="btn-danger" id="btnFecharTurnoOficial" style="width:100%; margin-top:15px; padding:12px;" onclick="encerrarTurnoDefinitivo()">🔴 Encerrar Turno e Fechar Caixa</button>
-            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardTotais')">Voltar / Cancelar</button>
         </div>
 
         <div class="card" id="cardRelatorio" style="display: none;">
             <h2>Relatório de Turno</h2>
             <div class="report-output" id="reportOutput"></div>
             <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir Fechamento</button>
-            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardRelatorio')">Voltar ao Menu</button>
         </div>
     </div>
 </div>
@@ -232,7 +230,7 @@
 
         <div class="modal-buttons">
             <button class="btn-cancel" onclick="fecharModal()">Voltar</button>
-            <button id="btnConfirmarSalvar" class="btn-incluir" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
+            <button class="btn-incluir" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
         </div>
         
     </div>
