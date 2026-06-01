@@ -199,7 +199,7 @@ function renderToggleAcoesDemo() {
     
     containerAviso.onclick = function() {
         let desafioAtual = localStorage.getItem('driverflux_codigo_desafio') || "0000";
-        let senhaUpgrade = prompt(`🔑 VALIDAÇÃO DEFINITIVA\nDesafio Atual: ${desafioAtual}\n\nInsira a Contra-Senha de Liberação Definitiva (Ou 222 na bancada):`);
+        let senhaUpgrade = prompt(`🔑 VALIDAÇÃO DEFINITIVA\nDesafio Atual: ${desafioAtual}\n\nInsira a Contra-Senha de Liberação Definitiva:`);
         
         if (senhaUpgrade) {
             let digitadaUpgrade = parseInt(senhaUpgrade.trim(), 10);
