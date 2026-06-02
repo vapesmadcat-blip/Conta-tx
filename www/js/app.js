@@ -788,29 +788,175 @@ function cancelarFechamento() {
     }
 }
 
-function consultarMasterAvancado() {
+function normalizarTextoConsulta(valor) {
+    return (valor || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function garantirBoxResultadoConsultaMaster() {
+    let box = document.getElementById('resultadoConsultaMaster');
+    if (box) return box;
+
+    const painel = document.getElementById('painelFiltroMaster');
+    box = document.createElement('div');
+    box.id = 'resultadoConsultaMaster';
+    box.style.display = 'none';
+    box.style.marginTop = '12px';
+    box.style.background = '#ffffff';
+    box.style.border = '1px solid #c7d2fe';
+    box.style.borderRadius = '14px';
+    box.style.padding = '14px';
+    box.style.boxShadow = '0 8px 18px rgba(79,70,229,0.08)';
+
+    if (painel) painel.appendChild(box);
+    return box;
+}
+
+function montarLinhaResultadoConsulta(item) {
+    const tipo = item.tipo === 'credito' ? 'Crédito' : 'Normal';
+    const cliente = item.cliente || 'Passageiro balcão';
+    const valorCorrida = parseFloat(item.corrida) || 0;
+    const emprestado = parseFloat(item.emprestado) || 0;
+    const total = valorCorrida + emprestado + (emprestado * 0.20);
+
+    return `
+        <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; margin-top:8px; background:#f8fafc;">
+            <div style="display:flex; justify-content:space-between; gap:10px; font-weight:800; color:#1e293b;">
+                <span>#${item.id || '-' } • ${tipo}</span>
+                <span>${formatarMoeda(total)}</span>
+            </div>
+            <div style="font-size:12px; color:#475569; margin-top:5px; line-height:1.45;">
+                👤 Cliente: <b>${cliente}</b><br>
+                🚕 Motorista: <b>${(item.motorista || usuarioLogado || 'N/I').toString().toUpperCase()}</b><br>
+                🚖 Prefixo: <b>${(item.prefixo || metadadosTurno.prefixoCarro || 'N/I').toString().toUpperCase()}</b><br>
+                📅 Data: ${item.dataHora || item.abertura || 'N/I'}<br>
+                💰 Corrida: ${formatarMoeda(valorCorrida)} ${emprestado > 0 ? ` • Empréstimo: ${formatarMoeda(emprestado)} + 20%` : ''}
+            </div>
+        </div>`;
+}
+
+async function carregarBaseConsultaMaster() {
+    const base = [];
+
+    if (localStorage.getItem('driverflux_modo_demo') === 'true' || !db) {
+        registros.forEach(r => base.push({
+            ...r,
+            motorista: usuarioLogado || 'demo_local',
+            prefixo: metadadosTurno.prefixoCarro || localStorage.getItem('driverflux_demo_prefixo') || 'DEMO'
+        }));
+        return base;
+    }
+
+    iniciarFirebaseSeNecessario();
+
+    const [snapTurnos, snapCorridas] = await Promise.all([
+        db.ref('turnos_operacionais').once('value'),
+        db.ref('corridas_por_turno').once('value')
+    ]);
+
+    const mapaTurnos = {};
+    const turnos = snapTurnos.val() || {};
+    Object.keys(turnos).forEach(motorista => {
+        Object.keys(turnos[motorista] || {}).forEach(tId => {
+            mapaTurnos[tId] = {
+                motorista,
+                prefixo: (turnos[motorista][tId] || {}).prefixoCarro || 'N/I',
+                abertura: (turnos[motorista][tId] || {}).abertura || ''
+            };
+        });
+    });
+
+    const corridasPorTurno = snapCorridas.val() || {};
+    Object.keys(corridasPorTurno).forEach(tId => {
+        const meta = mapaTurnos[tId] || {};
+        Object.keys(corridasPorTurno[tId] || {}).forEach(key => {
+            const r = corridasPorTurno[tId][key] || {};
+            base.push({
+                ...r,
+                fbKey: key,
+                turno: tId,
+                motorista: meta.motorista || 'N/I',
+                prefixo: meta.prefixo || 'N/I',
+                abertura: meta.abertura || ''
+            });
+        });
+    });
+
+    return base;
+}
+
+async function consultarMasterAvancado() {
     if (usuarioLogado !== 'master') {
-        alert("🔒 Função exclusiva para Master!");
+        alert('🔒 Função exclusiva para Master!');
         return;
     }
 
-    const opcao = prompt("1 = Por Cliente\n2 = Por Motorista\n3 = Por Prefixo\n\nDigite o número:", "1");
-    if (!opcao) return;
+    const tipoConsulta = prompt('Consultar por:\n1 = Cliente\n2 = Motorista\n3 = Prefixo do carro', '1');
+    if (!tipoConsulta) return;
 
-    const termo = prompt("Digite o nome ou prefixo:").trim();
-    if (!termo) return;
+    const termoDigitado = prompt('Digite o termo da consulta:');
+    if (!termoDigitado || !termoDigitado.trim()) return;
 
-    let texto = `🔍 CONSULTA AVANÇADA\n\n`;
+    const termo = normalizarTextoConsulta(termoDigitado);
+    const box = garantirBoxResultadoConsultaMaster();
+    box.style.display = 'block';
+    box.innerHTML = '<div style="font-weight:800; color:#4f46e5;">🔎 Consultando...</div>';
 
-    if (opcao === "1") {
-        texto += `Cliente: ${termo}\n• Histórico de corridas no crédito\n• Total devido + 20% de juros\n• Total já amortizado\n• Saldo pendente atual`;
-    } else if (opcao === "2") {
-        texto += `Motorista: ${termo}\n• Prefixos de carros que ele usou\n• Valor total por carro\n• Data de cada turno`;
-    } else if (opcao === "3") {
-        texto += `Prefixo: ${termo}\n• Quais motoristas dirigiram esse carro\n• Data e valor de cada corrida`;
+    try {
+        const base = await carregarBaseConsultaMaster();
+        let resultados = [];
+        let titulo = '';
+
+        if (tipoConsulta === '1') {
+            titulo = `Cliente: ${termoDigitado}`;
+            resultados = base.filter(r => normalizarTextoConsulta(r.cliente).includes(termo));
+        } else if (tipoConsulta === '2') {
+            titulo = `Motorista: ${termoDigitado}`;
+            resultados = base.filter(r => normalizarTextoConsulta(r.motorista).includes(termo));
+        } else if (tipoConsulta === '3') {
+            titulo = `Prefixo: ${termoDigitado}`;
+            resultados = base.filter(r => normalizarTextoConsulta(r.prefixo).includes(termo));
+        } else {
+            box.innerHTML = '<b style="color:#ef4444;">Opção inválida.</b>';
+            return;
+        }
+
+        let totalCorridas = 0;
+        let totalEmprestado = 0;
+        let totalComJuros = 0;
+        resultados.forEach(r => {
+            const corrida = parseFloat(r.corrida) || 0;
+            const emprestado = parseFloat(r.emprestado) || 0;
+            totalCorridas += corrida;
+            totalEmprestado += emprestado;
+            totalComJuros += corrida + emprestado + (emprestado * 0.20);
+        });
+
+        if (!resultados.length) {
+            box.innerHTML = `
+                <div style="font-weight:800; color:#4f46e5; margin-bottom:8px;">🔎 ${titulo}</div>
+                <div style="background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px; border-radius:10px;">
+                    Nenhum registro encontrado para esta consulta.
+                </div>`;
+            return;
+        }
+
+        box.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+                <div style="font-weight:900; color:#4f46e5;">🔎 ${titulo}</div>
+                <button onclick="document.getElementById('resultadoConsultaMaster').style.display='none'" style="padding:6px 10px; background:#e2e8f0; color:#334155; border-radius:8px;">Fechar</button>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                <div style="background:#eef2ff; padding:10px; border-radius:10px;"><b>${resultados.length}</b><br><span style="font-size:12px;">registros</span></div>
+                <div style="background:#ecfdf5; padding:10px; border-radius:10px;"><b>${formatarMoeda(totalComJuros)}</b><br><span style="font-size:12px;">total geral</span></div>
+                <div style="background:#f8fafc; padding:10px; border-radius:10px;"><b>${formatarMoeda(totalCorridas)}</b><br><span style="font-size:12px;">corridas</span></div>
+                <div style="background:#f8fafc; padding:10px; border-radius:10px;"><b>${formatarMoeda(totalEmprestado)}</b><br><span style="font-size:12px;">empréstimos</span></div>
+            </div>
+            <div style="max-height:360px; overflow:auto; padding-right:2px;">
+                ${resultados.map(montarLinhaResultadoConsulta).join('')}
+            </div>`;
+    } catch (err) {
+        box.innerHTML = `<b style="color:#ef4444;">Erro na consulta:</b><br>${err.message}`;
     }
-
-    alert(texto);
 }
 
 const _originalInit = inicializarMotorista;
