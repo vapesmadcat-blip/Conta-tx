@@ -422,7 +422,7 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
 
     if (reg.tipo === 'credito') {
         const totalDevido = reg.corrida + (reg.emprestado * 1.20);
-        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* \( {reg.cliente}\n💰 *Corrida:* R$ ${reg.corrida.toFixed(2)}\n🏦 *Empréstimo:* R$ ${reg.emprestado.toFixed(2)}\n📊 *Total com Juros (20%):* R$ ${totalDevido.toFixed(2)}\n📍 *Localização:* ${localizacaoGps}\n-----------------------------------------`;
+        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente}\n💰 *Corrida:* R$ ${reg.corrida.toFixed(2)}\n🏦 *Empréstimo:* R$ ${reg.emprestado.toFixed(2)}\n📊 *Total com Juros (20%):* R$ ${totalDevido.toFixed(2)}\n📍 *Localização:* ${localizacaoGps}\n-----------------------------------------`;
     } else {
         let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
         txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n👤 *CLIENTE:* ${descCliente}\n💰 *VALOR DA CORRIDA:* R$ ${reg.corrida.toFixed(2)}\n📅 *DATA/HORA:* ${reg.dataHora}\n📍 *LOCALIZAÇÃO GPS:* ${localizacaoGps}\n=========================================\nObrigado pela preferência!`;
@@ -439,7 +439,7 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
         
         if (!destino || destino === "51" || destino.length < 10) return alert("⚠️ Operação cancelada ou número inválido.");
         
-        let urlWhats = `whatsapp://send?phone=55${destino}&text={encodeURIComponent(txtMensagem)}`;
+        let urlWhats = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
         window.location.href = urlWhats;
     }
 }
@@ -473,7 +473,7 @@ function renderizarTabela() {
             acoesHtml += `<button class="btn-cancel" style="padding:4px 6px; font-size:11px;" onclick="abrirModalEdicao(${reg.id})">Editar</button>`;
         } else { acoesHtml += `🔒 Local`; }
 
-        tr.innerHTML = `<td>#${reg.id}</td><td> \){descTipo}</td><td>${descCliente}</td><td style="font-weight:bold;"> \){formatarMoeda(valorExibido)}</td><td>${acoesHtml}</td>`;
+        tr.innerHTML = `<td>#${reg.id}</td><td>${descTipo}</td><td>${descCliente}</td><td style="font-weight:bold;">${formatarMoeda(valorExibido)}</td><td>${acoesHtml}</td>`;
         tbody.appendChild(tr);
     });
 }
@@ -578,7 +578,7 @@ function inicializarMaster() {
             Object.keys(turnosHistoricoMaster[user]).forEach(tId => {
                 const t = turnosHistoricoMaster[user][tId];
                 const opt = document.createElement('option');
-                opt.value = `${user}|{tId}`;
+                opt.value = `${user}|${tId}`;
                 opt.innerText = `${user.toUpperCase()} - ${t.prefixoCarro} ({t.abertura})`;
                 select.appendChild(opt);
             });
@@ -666,7 +666,7 @@ function encerrarTurnoDefinitivo() {
         location.reload(); return;
     }
     iniciarFirebaseSeNecessario();
-    db.ref(`turnos_operacionais/${usuarioLogado}/{idTurnoAtivo}`).update({
+    db.ref(`turnos_operacionais/${usuarioLogado}/${idTurnoAtivo}`).update({
         status: 'fechado', fechamento: new Date().toLocaleString('pt-BR')
     }).then(() => { alert("Turno encerrado com sucesso!"); location.reload(); }).catch(err => {
         alert("Erro ao encerrar turno: " + err.message);
