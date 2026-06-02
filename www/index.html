@@ -112,7 +112,36 @@
         .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         
-        .report-output { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: none; }
+        .report-output { display: none; }
+        .report-pro { background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; }
+        .report-head { background:linear-gradient(135deg, #4f46e5, #111827); color:white; padding:18px; }
+        .report-head h3 { font-size:20px; margin-bottom:4px; }
+        .report-head p { font-size:12px; opacity:.9; line-height:1.4; }
+        .report-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:14px; }
+        .report-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; }
+        .report-card .label { font-size:11px; color:#64748b; font-weight:800; text-transform:uppercase; margin-bottom:4px; }
+        .report-card .value { font-size:19px; font-weight:900; color:#1e293b; }
+        .report-card.primary { background:#eef2ff; border-color:#c7d2fe; }
+        .report-card.success { background:#ecfdf5; border-color:#bbf7d0; }
+        .report-card.danger { background:#fef2f2; border-color:#fecaca; }
+        .report-card.warning { background:#fffbeb; border-color:#fde68a; }
+        .report-section { padding:14px; border-top:1px solid #e2e8f0; }
+        .report-section h4 { font-size:14px; margin-bottom:10px; color:#334155; display:flex; justify-content:space-between; gap:8px; }
+        .report-list-row { display:flex; justify-content:space-between; align-items:center; gap:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+        .report-list-row strong { color:#0f172a; }
+        .report-list-row span { font-weight:900; color:#4f46e5; white-space:nowrap; }
+        .report-table { width:100%; border-collapse:separate; border-spacing:0 6px; }
+        .report-table th { font-size:10px; color:#64748b; padding:6px; border:none; }
+        .report-table td { background:#f8fafc; border:none; padding:9px 6px; font-size:12px; }
+        .report-toolbar { display:flex; gap:8px; margin-top:12px; }
+        .report-toolbar button { flex:1; }
+        @media print {
+            body { background:white; padding:0; }
+            body * { visibility:hidden; }
+            #cardRelatorio, #cardRelatorio * { visibility:visible; }
+            #cardRelatorio { display:block !important; position:absolute; left:0; top:0; width:100%; box-shadow:none; margin:0; border-radius:0; }
+            .no-print { display:none !important; }
+        }
     </style>
 </head>
 <body>
@@ -254,9 +283,12 @@
         </div>
 
         <div class="card" id="cardRelatorio" style="display: none;">
-            <h2>Relatório de Turno</h2>
+            <h2>Relatório Profissional de Turno</h2>
             <div class="report-output" id="reportOutput"></div>
-            <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir Fechamento</button>
+            <div class="report-toolbar no-print">
+                <button class="btn-relatorio" onclick="window.print()">🖨️ Imprimir / PDF</button>
+                <button style="background:#64748b; color:white;" onclick="fecharRelatorioProfissional()">Fechar</button>
+            </div>
         </div>
     </div>
 </div>
