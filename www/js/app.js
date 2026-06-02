@@ -330,6 +330,13 @@ async function salvarDados() {
     if (btn && btn.disabled) return;
     if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Salvando..."; }
 
+    // Validar se há turno ativo
+    if (!idTurnoAtivo || idTurnoAtivo === "") {
+        alert("⚠️ Nenhum turno aberto! Por favor, abra um turno antes de lançar corridas.");
+        if (btn) { btn.disabled = false; btn.innerHTML = "Confirmar"; }
+        return;
+    }
+
     const editId = document.getElementById('editId').value;
     const tipo = document.getElementById('inputTipoLancamento').value;
     const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
@@ -395,7 +402,15 @@ async function salvarDados() {
 function finalizarSalvamento(dados, whats) {
     const btn = document.getElementById('btnConfirmarSalvar');
     if (btn) { btn.disabled = false; btn.innerHTML = "Confirmar"; }
-    fecharModal(); renderizarTabela(); atualizarListaSugestoes();
+    
+    fecharModal();
+    
+    setTimeout(() => {
+        renderizarTabela();
+        atualizarListaSugestoes();
+        alert("Corrida salva com sucesso!");
+    }, 500);
+    
     if (localStorage.getItem('driverflux_modo_demo') === 'true') { renderToggleAcoesDemo(); }
     if (dados.tipo === 'credito') { prepararDisparoReciboNativo(dados, whats); }
 }
