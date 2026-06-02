@@ -682,9 +682,12 @@ function renderizarSugestoesPagamento() {
 
 function selecionarClientePagamento(nome) {
     const input = document.getElementById('inputPesquisa');
-    if (input) input.value = nome;
-    esconderSugestoesPagamento();
+    if (input) {
+        input.value = nome;
+        input.blur();
+    }
     processarConsultaCliente(true);
+    esconderSugestoesPagamento();
 }
 
 function gerarRelatorio() {
@@ -815,7 +818,11 @@ function processarConsultaCliente(forcarExibicao = false) {
     const nomeDigitado = input ? input.value.trim() : '';
     const ficha = document.getElementById('fichaCliente');
 
-    renderizarSugestoesPagamento();
+    if (forcarExibicao) {
+        esconderSugestoesPagamento();
+    } else {
+        renderizarSugestoesPagamento();
+    }
 
     if (!nomeDigitado || !ficha) {
         if (ficha) ficha.style.display = 'none';
