@@ -617,16 +617,74 @@ function alternarBarraConsulta() {
     if(container) container.style.display = container.style.display === 'none' ? 'block' : 'none';
 }
 
+function obterClientesCreditoUnicos() {
+    return [...new Set(
+        registros
+            .filter(r => r.tipo === 'credito' && r.cliente && r.cliente.trim())
+            .map(r => r.cliente.trim())
+    )].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
 function atualizarListaSugestoes() {
     const datalist = document.getElementById('listaClientes');
     if (!datalist) return;
-    const clientesUnicos = [...new Set(registros.filter(r => r.tipo === 'credito').map(r => r.cliente))];
+    const clientesUnicos = obterClientesCreditoUnicos();
     datalist.innerHTML = '';
     clientesUnicos.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c;
         datalist.appendChild(opt);
     });
+}
+
+function mostrarSugestoesPagamento() {
+    renderizarSugestoesPagamento();
+}
+
+function esconderSugestoesPagamento() {
+    const box = document.getElementById('listaClientesPagamento');
+    if (box) box.style.display = 'none';
+}
+
+
+function escaparHtmlPagamento(valor) {
+    return (valor || '').toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderizarSugestoesPagamento() {
+    const input = document.getElementById('inputPesquisa');
+    const box = document.getElementById('listaClientesPagamento');
+    if (!input || !box) return;
+
+    const termo = normalizarTextoConsulta(input.value);
+    const clientes = obterClientesCreditoUnicos();
+    const filtrados = clientes
+        .filter(nome => !termo || normalizarTextoConsulta(nome).includes(termo))
+        .slice(0, 30);
+
+    if (!filtrados.length) {
+        box.innerHTML = '<div class="suggestion-empty">Nenhum cliente encontrado no crédito.</div>';
+        box.style.display = 'block';
+        return;
+    }
+
+    box.innerHTML = filtrados.map(nome => {
+        const corridasCliente = registros.filter(r => r.tipo === 'credito' && r.cliente && r.cliente.toLowerCase() === nome.toLowerCase()).length;
+        return `<button type="button" class="suggestion-item" onclick="selecionarClientePagamento(decodeURIComponent('${encodeURIComponent(nome)}'))">👤 ${escaparHtmlPagamento(nome)}<small>${corridasCliente} corrida(s)</small></button>`;
+    }).join('');
+    box.style.display = 'block';
+}
+
+function selecionarClientePagamento(nome) {
+    const input = document.getElementById('inputPesquisa');
+    if (input) input.value = nome;
+    esconderSugestoesPagamento();
+    processarConsultaCliente(true);
 }
 
 function gerarRelatorio() {
@@ -688,7 +746,7 @@ function processarConsultaCliente() {
     ficha.style.display = 'block';
 }
 
-function limparConsulta() { document.getElementById('inputPesquisa').value = ''; processarConsultaCliente(); }
+function limparConsulta() { document.getElementById('inputPesquisa').value = ''; esconderSugestoesPagamento(); const ficha = document.getElementById('fichaCliente'); if (ficha) ficha.style.display = 'none'; }
 function registrarPagamento() { alert("Funcionalidade de amortização em desenvolvimento."); }
 
 // ==================== AMORTIZAÇÃO COMPLETA + CONSULTA MASTER + CANCELAR FECHAMENTO ====================
@@ -752,14 +810,25 @@ function registrarPagamento() {
     }
 }
 
-function processarConsultaCliente() {
-    const nome = document.getElementById('inputPesquisa').value.trim();
+function processarConsultaCliente(forcarExibicao = false) {
+    const input = document.getElementById('inputPesquisa');
+    const nomeDigitado = input ? input.value.trim() : '';
     const ficha = document.getElementById('fichaCliente');
-    if (!nome || !ficha) {
+
+    renderizarSugestoesPagamento();
+
+    if (!nomeDigitado || !ficha) {
         if (ficha) ficha.style.display = 'none';
         return;
     }
 
+    const clienteExato = obterClientesCreditoUnicos().find(c => c.toLowerCase() === nomeDigitado.toLowerCase());
+    if (!clienteExato && !forcarExibicao) {
+        ficha.style.display = 'none';
+        return;
+    }
+
+    const nome = clienteExato || nomeDigitado;
     const corridas = registros.filter(r => 
         r.tipo === 'credito' && 
         r.cliente && 
