@@ -953,39 +953,181 @@ async function carregarBaseConsultaMaster() {
     return base;
 }
 
-async function consultarMasterAvancado() {
+
+let consultaMasterCache = [];
+let consultaMasterTipoAtual = 'cliente';
+
+function garantirModalConsultaMaster() {
+    let modal = document.getElementById('modalConsultaMaster');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'modalConsultaMaster';
+    modal.style.cssText = 'display:none; position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,0.72); padding:18px; align-items:center; justify-content:center;';
+    modal.innerHTML = `
+        <div style="width:100%; max-width:520px; max-height:92vh; overflow:hidden; background:white; border-radius:18px; box-shadow:0 18px 50px rgba(0,0,0,0.35); display:flex; flex-direction:column;">
+            <div style="padding:16px; background:#4f46e5; color:white; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <div>
+                    <div style="font-size:18px; font-weight:900;">🔎 Consulta Avançada</div>
+                    <div style="font-size:12px; opacity:.9;">Toque no tipo e escolha na lista rolável</div>
+                </div>
+                <button onclick="fecharModalConsultaMaster()" style="background:rgba(255,255,255,.18); color:white; border:1px solid rgba(255,255,255,.35); border-radius:10px; padding:8px 10px; font-weight:800;">✕</button>
+            </div>
+
+            <div style="padding:14px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                <button id="btnTipoClienteMaster" onclick="selecionarTipoConsultaMaster('cliente')" style="padding:12px 6px; border-radius:12px; font-weight:900; border:none;">👤 Cliente</button>
+                <button id="btnTipoMotoristaMaster" onclick="selecionarTipoConsultaMaster('motorista')" style="padding:12px 6px; border-radius:12px; font-weight:900; border:none;">🚕 Motorista</button>
+                <button id="btnTipoPrefixoMaster" onclick="selecionarTipoConsultaMaster('prefixo')" style="padding:12px 6px; border-radius:12px; font-weight:900; border:none;">🚖 Prefixo</button>
+            </div>
+
+            <div style="padding:0 14px 14px 14px;">
+                <input id="inputConsultaMasterModal" type="text" placeholder="Digite para filtrar..." autocomplete="off"
+                       oninput="renderizarSugestoesConsultaMaster()"
+                       style="width:100%; box-sizing:border-box; padding:14px; font-size:16px; border:2px solid #c7d2fe; border-radius:14px; outline:none;">
+            </div>
+
+            <div id="listaConsultaMasterModal" style="margin:0 14px 14px 14px; border:1px solid #e2e8f0; border-radius:14px; max-height:300px; overflow-y:auto; background:#f8fafc;"></div>
+
+            <div style="padding:14px; border-top:1px solid #e2e8f0; display:flex; gap:8px;">
+                <button onclick="executarConsultaMasterPeloModal()" style="flex:1; padding:13px; border:none; border-radius:12px; background:#16a34a; color:white; font-weight:900;">Consultar</button>
+                <button onclick="fecharModalConsultaMaster()" style="padding:13px; border:none; border-radius:12px; background:#e2e8f0; color:#334155; font-weight:900;">Cancelar</button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(modal);
+    return modal;
+}
+
+async function abrirModalConsultaMaster() {
     if (usuarioLogado !== 'master') {
         alert('🔒 Função exclusiva para Master!');
         return;
     }
 
-    const tipoConsulta = prompt('Consultar por:\n1 = Cliente\n2 = Motorista\n3 = Prefixo do carro', '1');
-    if (!tipoConsulta) return;
+    const modal = garantirModalConsultaMaster();
+    modal.style.display = 'flex';
 
-    const termoDigitado = prompt('Digite o termo da consulta:');
+    const lista = document.getElementById('listaConsultaMasterModal');
+    if (lista) lista.innerHTML = '<div style="padding:14px; color:#4f46e5; font-weight:800;">Carregando dados...</div>';
+
+    try {
+        consultaMasterCache = await carregarBaseConsultaMaster();
+        selecionarTipoConsultaMaster('cliente');
+        setTimeout(() => {
+            const input = document.getElementById('inputConsultaMasterModal');
+            if (input) input.focus();
+        }, 80);
+    } catch (err) {
+        if (lista) lista.innerHTML = `<div style="padding:14px; color:#ef4444; font-weight:800;">Erro ao carregar consulta:<br>${err.message}</div>`;
+    }
+}
+
+function fecharModalConsultaMaster() {
+    const modal = document.getElementById('modalConsultaMaster');
+    if (modal) modal.style.display = 'none';
+}
+
+function selecionarTipoConsultaMaster(tipo) {
+    consultaMasterTipoAtual = tipo;
+    const input = document.getElementById('inputConsultaMasterModal');
+    if (input) {
+        input.value = '';
+        input.placeholder = tipo === 'cliente' ? 'Digite o nome do cliente...' : tipo === 'motorista' ? 'Digite o nome do motorista...' : 'Digite o prefixo do carro...';
+    }
+
+    const botoes = {
+        cliente: document.getElementById('btnTipoClienteMaster'),
+        motorista: document.getElementById('btnTipoMotoristaMaster'),
+        prefixo: document.getElementById('btnTipoPrefixoMaster')
+    };
+
+    Object.keys(botoes).forEach(k => {
+        if (!botoes[k]) return;
+        botoes[k].style.background = k === tipo ? '#4f46e5' : '#e2e8f0';
+        botoes[k].style.color = k === tipo ? '#ffffff' : '#334155';
+    });
+
+    renderizarSugestoesConsultaMaster();
+}
+
+function obterValorCampoConsultaMaster(item, tipo) {
+    if (tipo === 'cliente') return item.cliente || '';
+    if (tipo === 'motorista') return item.motorista || '';
+    return item.prefixo || '';
+}
+
+function renderizarSugestoesConsultaMaster() {
+    const lista = document.getElementById('listaConsultaMasterModal');
+    const input = document.getElementById('inputConsultaMasterModal');
+    if (!lista || !input) return;
+
+    const termo = normalizarTextoConsulta(input.value);
+    const mapa = new Map();
+
+    consultaMasterCache.forEach(item => {
+        const valor = (obterValorCampoConsultaMaster(item, consultaMasterTipoAtual) || '').toString().trim();
+        if (!valor) return;
+        const chave = normalizarTextoConsulta(valor);
+        if (termo && !chave.includes(termo)) return;
+        if (!mapa.has(chave)) mapa.set(chave, { texto: valor, qtd: 0 });
+        mapa.get(chave).qtd++;
+    });
+
+    const opcoes = Array.from(mapa.values()).sort((a, b) => a.texto.localeCompare(b.texto)).slice(0, 80);
+
+    if (!opcoes.length) {
+        lista.innerHTML = '<div style="padding:14px; color:#64748b;">Nenhuma opção encontrada. Você ainda pode digitar e tocar em Consultar.</div>';
+        return;
+    }
+
+    lista.innerHTML = opcoes.map(op => `
+        <button onclick="escolherSugestaoConsultaMaster('${consultaMasterTipoAtual}', '${encodeURIComponent(op.texto)}')"
+                style="width:100%; text-align:left; padding:13px 14px; border:0; border-bottom:1px solid #e2e8f0; background:white; display:flex; justify-content:space-between; gap:10px; align-items:center;">
+            <span style="font-weight:900; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${op.texto}</span>
+            <span style="font-size:12px; color:#4f46e5; background:#eef2ff; padding:4px 7px; border-radius:999px; white-space:nowrap;">${op.qtd} reg.</span>
+        </button>`).join('');
+}
+
+function escolherSugestaoConsultaMaster(tipo, valorCodificado) {
+    consultaMasterTipoAtual = tipo;
+    const valor = decodeURIComponent(valorCodificado);
+    const input = document.getElementById('inputConsultaMasterModal');
+    if (input) input.value = valor;
+    executarConsultaMaster(tipo, valor);
+}
+
+function executarConsultaMasterPeloModal() {
+    const input = document.getElementById('inputConsultaMasterModal');
+    const termo = input ? input.value : '';
+    executarConsultaMaster(consultaMasterTipoAtual, termo);
+}
+
+async function executarConsultaMaster(tipoConsulta, termoDigitado) {
     if (!termoDigitado || !termoDigitado.trim()) return;
 
     const termo = normalizarTextoConsulta(termoDigitado);
     const box = garantirBoxResultadoConsultaMaster();
     box.style.display = 'block';
     box.innerHTML = '<div style="font-weight:800; color:#4f46e5;">🔎 Consultando...</div>';
+    fecharModalConsultaMaster();
 
     try {
-        const base = await carregarBaseConsultaMaster();
+        const base = consultaMasterCache.length ? consultaMasterCache : await carregarBaseConsultaMaster();
+        consultaMasterCache = base;
         let resultados = [];
         let titulo = '';
 
-        if (tipoConsulta === '1') {
+        if (tipoConsulta === 'cliente') {
             titulo = `Cliente: ${termoDigitado}`;
             resultados = base.filter(r => normalizarTextoConsulta(r.cliente).includes(termo));
-        } else if (tipoConsulta === '2') {
+        } else if (tipoConsulta === 'motorista') {
             titulo = `Motorista: ${termoDigitado}`;
             resultados = base.filter(r => normalizarTextoConsulta(r.motorista).includes(termo));
-        } else if (tipoConsulta === '3') {
+        } else if (tipoConsulta === 'prefixo') {
             titulo = `Prefixo: ${termoDigitado}`;
             resultados = base.filter(r => normalizarTextoConsulta(r.prefixo).includes(termo));
         } else {
-            box.innerHTML = '<b style="color:#ef4444;">Opção inválida.</b>';
+            box.innerHTML = '<b style="color:#ef4444;">Tipo de consulta inválido.</b>';
             return;
         }
 
@@ -1002,7 +1144,10 @@ async function consultarMasterAvancado() {
 
         if (!resultados.length) {
             box.innerHTML = `
-                <div style="font-weight:800; color:#4f46e5; margin-bottom:8px;">🔎 ${titulo}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                    <div style="font-weight:800; color:#4f46e5;">🔎 ${titulo}</div>
+                    <button onclick="abrirModalConsultaMaster()" style="padding:6px 10px; background:#4f46e5; color:white; border-radius:8px;">Nova consulta</button>
+                </div>
                 <div style="background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px; border-radius:10px;">
                     Nenhum registro encontrado para esta consulta.
                 </div>`;
@@ -1012,7 +1157,10 @@ async function consultarMasterAvancado() {
         box.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
                 <div style="font-weight:900; color:#4f46e5;">🔎 ${titulo}</div>
-                <button onclick="document.getElementById('resultadoConsultaMaster').style.display='none'" style="padding:6px 10px; background:#e2e8f0; color:#334155; border-radius:8px;">Fechar</button>
+                <div style="display:flex; gap:6px;">
+                    <button onclick="abrirModalConsultaMaster()" style="padding:6px 10px; background:#4f46e5; color:white; border-radius:8px;">Nova</button>
+                    <button onclick="document.getElementById('resultadoConsultaMaster').style.display='none'" style="padding:6px 10px; background:#e2e8f0; color:#334155; border-radius:8px;">Fechar</button>
+                </div>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
                 <div style="background:#eef2ff; padding:10px; border-radius:10px;"><b>${resultados.length}</b><br><span style="font-size:12px;">registros</span></div>
@@ -1028,6 +1176,10 @@ async function consultarMasterAvancado() {
     }
 }
 
+async function consultarMasterAvancado() {
+    abrirModalConsultaMaster();
+}
+
 const _originalInit = inicializarMotorista;
 inicializarMotorista = function() {
     _originalInit();
@@ -1037,6 +1189,12 @@ inicializarMotorista = function() {
 window.registrarPagamento = registrarPagamento;
 window.cancelarFechamento = cancelarFechamento;
 window.consultarMasterAvancado = consultarMasterAvancado;
+window.abrirModalConsultaMaster = abrirModalConsultaMaster;
+window.fecharModalConsultaMaster = fecharModalConsultaMaster;
+window.selecionarTipoConsultaMaster = selecionarTipoConsultaMaster;
+window.renderizarSugestoesConsultaMaster = renderizarSugestoesConsultaMaster;
+window.escolherSugestaoConsultaMaster = escolherSugestaoConsultaMaster;
+window.executarConsultaMasterPeloModal = executarConsultaMasterPeloModal;
 
 window.onload = () => { 
     checarLicenciamento(); 
