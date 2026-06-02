@@ -798,7 +798,109 @@ function registrarPagamento() {
         pendenteEl.innerText = formatarMoeda(Math.max(0, atual - valor));
     }
 }
+// ==================== CONSULTA AVANÇADA MASTER ====================
 
+let abaAtual = 1;
+
+function abrirModalConsultaMaster() {
+    if (usuarioLogado !== 'master') {
+        alert("🔒 Esta função é exclusiva para o Master.");
+        return;
+    }
+    document.getElementById('modalConsultaMaster').style.display = 'flex';
+    mudarAbaConsulta(1);
+}
+
+function fecharModalConsultaMaster() {
+    document.getElementById('modalConsultaMaster').style.display = 'none';
+}
+
+function mudarAbaConsulta(aba) {
+    abaAtual = aba;
+    document.getElementById('aba1').style.background = aba === 1 ? '#4f46e5' : '#e2e8f0';
+    document.getElementById('aba2').style.background = aba === 2 ? '#4f46e5' : '#e2e8f0';
+    document.getElementById('aba3').style.background = aba === 3 ? '#4f46e5' : '#e2e8f0';
+    document.getElementById('inputBuscaMaster').value = '';
+    document.getElementById('resultadoConsultaMaster').innerHTML = '';
+}
+
+function buscarMaster() {
+    const termo = document.getElementById('inputBuscaMaster').value.trim().toLowerCase();
+    if (!termo || termo.length < 2) {
+        alert("Digite pelo menos 2 caracteres para buscar.");
+        return;
+    }
+
+    iniciarFirebaseSeNecessario();
+    const resultadoDiv = document.getElementById('resultadoConsultaMaster');
+    resultadoDiv.innerHTML = "<p>🔍 Buscando...</p>";
+
+    if (abaAtual === 1) { // Por Cliente
+        db.ref('corridas_por_turno').once('value', snapshot => {
+            let html = `<h4>Histórico do Cliente: <b>${termo}</b></h4>`;
+            let totalDevido = 0;
+            let encontrou = false;
+            
+            snapshot.forEach(turnoSnap => {
+                turnoSnap.forEach(corridaSnap => {
+                    const r = corridaSnap.val();
+                    if (r.tipo === 'credito' && r.cliente && r.cliente.toLowerCase().includes(termo)) {
+                        encontrou = true;
+                        html += `<div style="background:#f8fafc; padding:10px; margin:8px 0; border-radius:8px;">
+                            <strong>${r.dataHora}</strong> - R$ ${r.corrida} 
+                            ${r.emprestado ? `(Empréstimo: R$ ${r.emprestado})` : ''}
+                        </div>`;
+                        totalDevido += r.corrida + (r.emprestado || 0);
+                    }
+                });
+            });
+            
+            if (!encontrou) html += "<p>Nenhum registro encontrado para este cliente.</p>";
+            else html += `<p style="font-weight:700; margin-top:12px;">Total Devido: ${formatarMoeda(totalDevido)}</p>`;
+            
+            resultadoDiv.innerHTML = html;
+        });
+    } 
+    else if (abaAtual === 2) { // Por Motorista
+        db.ref('turnos_operacionais').once('value', snapshot => {
+            let html = `<h4>Corridas do Motorista: <b>${termo}</b></h4>`;
+            let encontrou = false;
+            snapshot.forEach(userSnap => {
+                if (userSnap.key.toLowerCase().includes(termo)) {
+                    encontrou = true;
+                    html += `<p><strong>Motorista:</strong> ${userSnap.key.toUpperCase()}</p>`;
+                    userSnap.forEach(turnoSnap => {
+                        const t = turnoSnap.val();
+                        html += `<div style="margin-left:15px;">• Turno: ${turnoSnap.key} | Prefixo: ${t.prefixoCarro || 'N/I'}</div>`;
+                    });
+                }
+            });
+            resultadoDiv.innerHTML = encontrou ? html : '<p>Nenhum motorista encontrado.</p>';
+        });
+    } 
+    else if (abaAtual === 3) { // Por Prefixo
+        db.ref('turnos_operacionais').once('value', snapshot => {
+            let html = `<h4>Corridas com Prefixo: <b>${termo}</b></h4>`;
+            let encontrou = false;
+            snapshot.forEach(userSnap => {
+                userSnap.forEach(turnoSnap => {
+                    const t = turnoSnap.val();
+                    if (t.prefixoCarro && t.prefixoCarro.toLowerCase().includes(termo)) {
+                        encontrou = true;
+                        html += `<p><strong>Prefixo:</strong> ${t.prefixoCarro} | Motorista: ${userSnap.key}</p>`;
+                    }
+                });
+            });
+            resultadoDiv.innerHTML = encontrou ? html : '<p>Nenhum carro encontrado com este prefixo.</p>';
+        });
+    }
+}
+
+// Expor funções para HTML
+window.abrirModalConsultaMaster = abrirModalConsultaMaster;
+window.fecharModalConsultaMaster = fecharModalConsultaMaster;
+window.mudarAbaConsulta = mudarAbaConsulta;
+window.buscarMaster = buscarMaster;
 window.onload = () => { 
     checarLicenciamento(); 
     // Garantia extra para master
