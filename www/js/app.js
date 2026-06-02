@@ -149,7 +149,7 @@ function verificarSessaoLogin() {
                 inicializarMaster();
             } else {
                 document.getElementById('painelFiltroMaster').style.display = 'none';
-                document.getElementById('lblUsuarioAtivo').innerText = `Operador: \( {usuarioLogado.toUpperCase()} ( \){contratoStr})`;
+                document.getElementById('lblUsuarioAtivo').innerText = `Operador: ${usuarioLogado.toUpperCase()} ({contratoStr})`;
                 verificarStatusTurnoMotorista();
             }
         });
@@ -269,7 +269,7 @@ function verificarStatusTurnoMotorista() {
             document.getElementById('conteudoApp').style.display = 'block';
             
             let prefixoAtivo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
-            document.getElementById('lblIdTurnoAtivo').innerText = `🚖 Carro: \( {prefixoAtivo} | Turno: # \){idTurnoAtivo.substring(1, 8).toUpperCase()}`;
+            document.getElementById('lblIdTurnoAtivo').innerText = `🚖 Carro: ${prefixoAtivo} | Turno: #{idTurnoAtivo.substring(1, 8).toUpperCase()}`;
             inicializarMotorista();
         } else {
             document.getElementById('conteudoApp').style.display = 'none';
@@ -374,7 +374,7 @@ async function salvarDados() {
             const regOriginal = registros.find(r => r.id == editId);
             if (regOriginal && regOriginal.fbKey) {
                 dadosCorrida.id = parseInt(editId);
-                db.ref(`corridas_por_turno/\( {idTurnoAtivo}/ \){regOriginal.fbKey}`).update(dadosCorrida).then(() => {
+                db.ref(`corridas_por_turno/${idTurnoAtivo}/${regOriginal.fbKey}`).update(dadosCorrida).then(() => {
                     finalizarSalvamento(dadosCorrida, whatsCliente);
                 }).catch(err => {
                     alert("Erro ao atualizar: " + err.message);
@@ -407,16 +407,16 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
 
     if (reg.tipo === 'credito') {
         const totalDevido = reg.corrida + (reg.emprestado * 1.20);
-        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* \( {reg.cliente}\n💰 *Corrida:* R \) \( {reg.corrida.toFixed(2)}\n🏦 *Empréstimo:* R \) \( {reg.emprestado.toFixed(2)}\n📊 *Total com Juros (20%):* R \) ${totalDevido.toFixed(2)}\n📍 *Localização:* ${localizacaoGps}\n-----------------------------------------`;
+        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* \( {reg.cliente}\n💰 *Corrida:* R$ ${reg.corrida.toFixed(2)}\n🏦 *Empréstimo:* R$ ${reg.emprestado.toFixed(2)}\n📊 *Total com Juros (20%):* R$ ${totalDevido.toFixed(2)}\n📍 *Localização:* ${localizacaoGps}\n-----------------------------------------`;
     } else {
         let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
-        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n👤 *CLIENTE:* \( {descCliente}\n💰 *VALOR DA CORRIDA:* R \) ${reg.corrida.toFixed(2)}\n📅 *DATA/HORA:* ${reg.dataHora}\n📍 *LOCALIZAÇÃO GPS:* ${localizacaoGps}\n=========================================\nObrigado pela preferência!`;
+        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n👤 *CLIENTE:* ${descCliente}\n💰 *VALOR DA CORRIDA:* R$ ${reg.corrida.toFixed(2)}\n📅 *DATA/HORA:* ${reg.dataHora}\n📍 *LOCALIZAÇÃO GPS:* ${localizacaoGps}\n=========================================\nObrigado pela preferência!`;
     }
 
     if (!whatsappSugerido && reg.tipo === 'credito') return;
 
     let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
-    if (confirmirEnvio) {
+    if (confirmarEnvio) {
         let destino = whatsappSugerido;
         if (!destino || destino === "51") {
             destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", "51");
@@ -424,7 +424,7 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
         
         if (!destino || destino === "51" || destino.length < 10) return alert("⚠️ Operação cancelada ou número inválido.");
         
-        let urlWhats = `whatsapp://send?phone=55\( {destino}&text= \){encodeURIComponent(txtMensagem)}`;
+        let urlWhats = `whatsapp://send?phone=55${destino}&text={encodeURIComponent(txtMensagem)}`;
         window.location.href = urlWhats;
     }
 }
@@ -458,7 +458,7 @@ function renderizarTabela() {
             acoesHtml += `<button class="btn-cancel" style="padding:4px 6px; font-size:11px;" onclick="abrirModalEdicao(${reg.id})">Editar</button>`;
         } else { acoesHtml += `🔒 Local`; }
 
-        tr.innerHTML = `<td>#\( {reg.id}</td><td> \){descTipo}</td><td>\( {descCliente}</td><td style="font-weight:bold;"> \){formatarMoeda(valorExibido)}</td><td>${acoesHtml}</td>`;
+        tr.innerHTML = `<td>#${reg.id}</td><td> \){descTipo}</td><td>${descCliente}</td><td style="font-weight:bold;"> \){formatarMoeda(valorExibido)}</td><td>${acoesHtml}</td>`;
         tbody.appendChild(tr);
     });
 }
@@ -563,8 +563,8 @@ function inicializarMaster() {
             Object.keys(turnosHistoricoMaster[user]).forEach(tId => {
                 const t = turnosHistoricoMaster[user][tId];
                 const opt = document.createElement('option');
-                opt.value = `\( {user}| \){tId}`;
-                opt.innerText = `${user.toUpperCase()} - \( {t.prefixoCarro} ( \){t.abertura})`;
+                opt.value = `${user}|{tId}`;
+                opt.innerText = `${user.toUpperCase()} - ${t.prefixoCarro} ({t.abertura})`;
                 select.appendChild(opt);
             });
         });
@@ -651,7 +651,7 @@ function encerrarTurnoDefinitivo() {
         location.reload(); return;
     }
     iniciarFirebaseSeNecessario();
-    db.ref(`turnos_operacionais/\( {usuarioLogado}/ \){idTurnoAtivo}`).update({
+    db.ref(`turnos_operacionais/${usuarioLogado}/{idTurnoAtivo}`).update({
         status: 'fechado', fechamento: new Date().toLocaleString('pt-BR')
     }).then(() => { alert("Turno encerrado com sucesso!"); location.reload(); }).catch(err => {
         alert("Erro ao encerrar turno: " + err.message);
