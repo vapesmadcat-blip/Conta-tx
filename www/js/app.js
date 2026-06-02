@@ -748,27 +748,188 @@ function selecionarClientePagamento(nome) {
     esconderSugestoesPagamento();
 }
 
+
+function numeroSeguro(valor) {
+    const n = parseFloat(valor);
+    return isNaN(n) ? 0 : n;
+}
+
+function escaparHtmlRelatorio(valor) {
+    return (valor || '').toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function somarGrupoRelatorio(mapa, chave, valor) {
+    const nome = (chave && chave.toString().trim()) ? chave.toString().trim() : 'Não informado';
+    if (!mapa[nome]) mapa[nome] = { qtd: 0, total: 0 };
+    mapa[nome].qtd += 1;
+    mapa[nome].total += valor;
+}
+
+function linhasGrupoRelatorio(mapa, vazioTexto) {
+    const itens = Object.keys(mapa)
+        .map(nome => ({ nome, ...mapa[nome] }))
+        .sort((a, b) => b.total - a.total);
+
+    if (!itens.length) {
+        return `<div class="report-list-row"><strong>${vazioTexto}</strong><span>R$ 0,00</span></div>`;
+    }
+
+    return itens.map(item => `
+        <div class="report-list-row">
+            <strong>${escaparHtmlRelatorio(item.nome)} <small style="color:#64748b; font-weight:700;">(${item.qtd})</small></strong>
+            <span>${formatarMoeda(item.total)}</span>
+        </div>
+    `).join('');
+}
+
+function linhasTabelaCorridasRelatorio(lista) {
+    if (!lista.length) {
+        return `<div class="report-list-row"><strong>Nenhuma corrida lançada neste turno.</strong><span>-</span></div>`;
+    }
+
+    return `
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>DATA</th>
+                    <th>CLIENTE</th>
+                    <th>TIPO</th>
+                    <th>VALOR</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${lista.map(r => {
+                    const corrida = numeroSeguro(r.corrida);
+                    const emprestado = numeroSeguro(r.emprestado);
+                    const totalCredito = corrida + emprestado + (emprestado * 0.20);
+                    const valorExibido = r.tipo === 'credito' ? totalCredito : corrida;
+                    return `
+                        <tr>
+                            <td>#${escaparHtmlRelatorio(r.id || '-')}</td>
+                            <td>${escaparHtmlRelatorio(r.dataHora || '-')}</td>
+                            <td>${escaparHtmlRelatorio(r.cliente || 'Passageiro Avulso')}</td>
+                            <td>${r.tipo === 'credito' ? 'Crédito' : 'Dinheiro'}</td>
+                            <td><b>${formatarMoeda(valorExibido)}</b></td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>`;
+}
+
 function gerarRelatorio() {
-    let tNormais = 0, tCredito = 0, tEmprestado = 0;
-    registros.forEach(r => { 
-        if (r.tipo === 'credito') { tCredito += r.corrida; tEmprestado += r.emprestado; } else { tNormais += r.corrida; } 
+    const output = document.getElementById('reportOutput');
+    const card = document.getElementById('cardRelatorio');
+    if (!output || !card) return;
+
+    let tNormais = 0;
+    let tCreditoCorridas = 0;
+    let tEmprestado = 0;
+    let tJuros = 0;
+    const porCliente = {};
+    const porMotorista = {};
+    const porPrefixo = {};
+
+    const motoristaAtivo = (usuarioLogado || metadadosTurno.motorista || 'Não informado').toString().toUpperCase();
+    const prefixoAtivo = (metadadosTurno.prefixoCarro || localStorage.getItem('driverflux_demo_prefixo') || 'N/I').toString().toUpperCase();
+    const fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
+
+    registros.forEach(r => {
+        const corrida = numeroSeguro(r.corrida);
+        const emprestado = numeroSeguro(r.emprestado);
+        const juros = emprestado * 0.20;
+        const valorTotal = r.tipo === 'credito' ? (corrida + emprestado + juros) : corrida;
+
+        if (r.tipo === 'credito') {
+            tCreditoCorridas += corrida;
+            tEmprestado += emprestado;
+            tJuros += juros;
+            somarGrupoRelatorio(porCliente, r.cliente || 'Cliente sem nome', valorTotal);
+        } else {
+            tNormais += corrida;
+            somarGrupoRelatorio(porCliente, r.cliente || 'Passageiro Avulso', valorTotal);
+        }
+
+        somarGrupoRelatorio(porMotorista, motoristaAtivo, valorTotal);
+        somarGrupoRelatorio(porPrefixo, prefixoAtivo, valorTotal);
     });
-    
-    let fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
-    let totalCarro = fundo + tNormais;
-    let pfxAtivo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
 
-    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n=========================================\n`;
-    txt += `🚖 VEÍCULO / PREFIXO AUDITADO: ${pfxAtivo}\n👤 MOTORISTA / OPERADOR: ${usuarioLogado.toUpperCase()}\n=========================================\n\n`;
-    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n`;
-    txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n=========================================\n`;
+    const totalCreditoComJuros = tCreditoCorridas + tEmprestado + tJuros;
+    const totalPago = (pagamentos || []).reduce((acc, p) => acc + numeroSeguro(p.valor), 0);
+    const saldoPendente = Math.max(totalCreditoComJuros - totalPago, 0);
+    const producaoTotal = tNormais + totalCreditoComJuros;
+    const dinheiroEsperado = fundo + tNormais + totalPago;
+    const dataGeracao = new Date().toLocaleString('pt-BR');
 
-    let imprimir = confirm(`📄 FECHAMENTO DE TURNO:\n\n${txt}\n\nDeseja abrir a janela de impressão do sistema?`);
-    if (imprimir) {
-        const output = document.getElementById('reportOutput');
-        const card = document.getElementById('cardRelatorio');
-        if(output && card) { output.innerText = txt; card.style.display = 'block'; }
-        window.print();
+    output.innerHTML = `
+        <div class="report-pro">
+            <div class="report-head">
+                <h3>🧾 DriverFlux — Relatório de Turno</h3>
+                <p>
+                    Motorista: <b>${escaparHtmlRelatorio(motoristaAtivo)}</b> • Prefixo: <b>${escaparHtmlRelatorio(prefixoAtivo)}</b><br>
+                    Turno: ${escaparHtmlRelatorio(idTurnoAtivo || metadadosTurno.id || 'DEMO')} • Abertura: ${escaparHtmlRelatorio(metadadosTurno.abertura || 'N/I')}<br>
+                    Gerado em: ${escaparHtmlRelatorio(dataGeracao)}
+                </p>
+            </div>
+
+            <div class="report-grid">
+                <div class="report-card primary"><div class="label">Corridas</div><div class="value">${registros.length}</div></div>
+                <div class="report-card success"><div class="label">Produção total</div><div class="value">${formatarMoeda(producaoTotal)}</div></div>
+                <div class="report-card"><div class="label">Dinheiro + amortizações</div><div class="value">${formatarMoeda(dinheiroEsperado)}</div></div>
+                <div class="report-card warning"><div class="label">Crédito lançado</div><div class="value">${formatarMoeda(totalCreditoComJuros)}</div></div>
+                <div class="report-card success"><div class="label">Amortizado</div><div class="value">${formatarMoeda(totalPago)}</div></div>
+                <div class="report-card danger"><div class="label">Saldo pendente</div><div class="value">${formatarMoeda(saldoPendente)}</div></div>
+            </div>
+
+            <div class="report-section">
+                <h4>Resumo do Caixa <span>${formatarMoeda(dinheiroEsperado)}</span></h4>
+                <div class="report-list-row"><strong>Troco inicial</strong><span>${formatarMoeda(fundo)}</span></div>
+                <div class="report-list-row"><strong>Corridas pagas em dinheiro</strong><span>${formatarMoeda(tNormais)}</span></div>
+                <div class="report-list-row"><strong>Pagamentos/amortizações recebidos</strong><span>${formatarMoeda(totalPago)}</span></div>
+                <div class="report-list-row"><strong>Corridas no crédito</strong><span>${formatarMoeda(tCreditoCorridas)}</span></div>
+                <div class="report-list-row"><strong>Empréstimos</strong><span>${formatarMoeda(tEmprestado)}</span></div>
+                <div class="report-list-row"><strong>Taxa/juros 20%</strong><span>${formatarMoeda(tJuros)}</span></div>
+            </div>
+
+            <div class="report-section">
+                <h4>Totais por Cliente</h4>
+                ${linhasGrupoRelatorio(porCliente, 'Nenhum cliente no relatório')}
+            </div>
+
+            <div class="report-section">
+                <h4>Totais por Motorista</h4>
+                ${linhasGrupoRelatorio(porMotorista, 'Nenhum motorista no relatório')}
+            </div>
+
+            <div class="report-section">
+                <h4>Totais por Prefixo</h4>
+                ${linhasGrupoRelatorio(porPrefixo, 'Nenhum prefixo no relatório')}
+            </div>
+
+            <div class="report-section">
+                <h4>Detalhamento das Corridas</h4>
+                ${linhasTabelaCorridasRelatorio(registros)}
+            </div>
+        </div>`;
+
+    output.style.display = 'block';
+    card.style.display = 'block';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function fecharRelatorioProfissional() {
+    const card = document.getElementById('cardRelatorio');
+    const output = document.getElementById('reportOutput');
+    if (card) card.style.display = 'none';
+    if (output) {
+        output.innerHTML = '';
+        output.style.display = 'none';
     }
 }
 
