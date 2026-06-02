@@ -50,6 +50,38 @@
         .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
         .search-box input { flex: 1; padding: 12px; border: 2px solid var(--primary); border-radius: 10px; font-size: 15px; outline: none; }
 
+        .autocomplete-wrap { position: relative; flex: 1; }
+        .autocomplete-wrap input { width: 100%; }
+        .suggestion-box {
+            display: none;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: calc(100% + 6px);
+            z-index: 50;
+            max-height: 190px;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+            padding: 6px;
+        }
+        .suggestion-item {
+            width: 100%;
+            text-align: left;
+            justify-content: flex-start;
+            background: #f8fafc;
+            color: #1e293b;
+            border-radius: 10px;
+            padding: 11px 12px;
+            margin-bottom: 5px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .suggestion-item small { color: #64748b; font-weight: 600; margin-left: auto; }
+        .suggestion-empty { padding: 10px 12px; font-size: 13px; color: #64748b; }
+
         .client-ledger-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; display: none; }
         .ledger-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
         .ledger-row.balance { font-weight: 800; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 8px; }
@@ -151,8 +183,10 @@
         <!-- BARRA DE PESQUISA DE CLIENTES -->
         <div class="search-container" id="containerPesquisa">
             <div class="search-box">
-                <input type="text" id="inputPesquisa" placeholder="Buscar cliente no crédito..." list="listaClientesConsulta" oninput="processarConsultaCliente()">
-                <datalist id="listaClientesConsulta"></datalist>
+                <div class="autocomplete-wrap">
+                    <input type="text" id="inputPesquisa" placeholder="Digite o cliente para pagar..." autocomplete="off" oninput="processarConsultaCliente()" onfocus="mostrarSugestoesPagamento()">
+                    <div id="listaClientesPagamento" class="suggestion-box"></div>
+                </div>
                 <button onclick="limparConsulta()" style="background:#e2e8f0; padding:0 10px; border-radius:10px;">X</button>
             </div>
             <div class="client-ledger-box" id="fichaCliente">
