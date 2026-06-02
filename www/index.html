@@ -65,13 +65,10 @@
         .success-text { color: var(--success); font-weight: 600; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
-        .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 400px; box-shadow: var(--shadow); }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         
         .report-output { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: none; }
-
-        .aba-consulta { display: flex; gap: 8px; margin-bottom: 16px; }
-        .aba-consulta button { flex: 1; padding: 12px; font-weight: 600; border-radius: 8px; border: none; }
     </style>
 </head>
 <body>
@@ -85,7 +82,7 @@
             <label>Digite a Contra-Senha</label>
             <input type="number" id="inputContraSenha" placeholder="Código de liberação">
         </div>
-        <button class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
+        <button id="btnAtivar" class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
     </div>
 
     <div id="telaLogin" class="card" style="display: none;">
@@ -98,7 +95,7 @@
             <label>Senha de Acesso</label>
             <input type="password" id="loginSenha" placeholder="******">
         </div>
-        <button class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
+        <button id="btnLogin" class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
     </div>
 
     <div id="telaAberturaTurno" class="card" style="display: none;">
@@ -111,7 +108,7 @@
             <label>🚗 Hodômetro Inicial (KM Atual do Painel)</label>
             <input type="number" id="inputKmInicial" placeholder="Ex: 142350">
         </div>
-        <button class="btn-incluir" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px;" onclick="abrirTurnoOperacional()">Iniciar Trabalho</button>
+        <button id="btnAbrirTurno" class="btn-incluir" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px;" onclick="abrirTurnoOperacional()">Iniciar Trabalho</button>
     </div>
 
     <div id="conteudoApp" style="display: none;">
@@ -131,25 +128,17 @@
                     <option value="">Carregando histórico de caixas...</option>
                 </select>
             </div>
-            
-            <!-- === BOTÃO NOVA CONSULTA AVANÇADA === -->
-            <button onclick="abrirModalConsultaMaster()" 
-                    style="width: 100%; margin: 12px 0; padding: 14px; background: #7c3aed; color: white; border: none; border-radius: 10px; font-weight: 700;">
-                🔎 Consulta Avançada (Master)
-            </button>
-            
-            <button class="btn-relatorio" style="width: 100%; background: var(--primary);" onclick="cadastrarNovoMotoristaMaster()">👤 Cadastrar Novo Motorista</button>
+            <button class="btn-relatorio" style="width: 100%; margin-top: 12px; background: var(--primary);" onclick="cadastrarNovoMotoristaMaster()">👤 Cadastrar Novo Motorista</button>
         </div>
 
         <div class="btn-grid-actions">
-            <button class="btn-incluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
+            <button class="btn-incluir" id="btnMenuIncluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
             <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
             <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
             <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
         </div>
 
         <div class="search-container" id="containerPesquisa">
-            <!-- ... seu conteúdo original de pesquisa ... -->
             <div class="search-box">
                 <input type="text" id="inputPesquisa" placeholder="Buscar cliente no crédito..." list="listaClientesConsulta" oninput="processarConsultaCliente()">
                 <datalist id="listaClientesConsulta"></datalist>
@@ -195,40 +184,18 @@
             <div class="result-row total-final"><span>Dinheiro Vivo Esperado:</span> <span id="totGeral">R$ 0,00</span></div>
             
             <button class="btn-danger" id="btnFecharTurnoOficial" style="width:100%; margin-top:15px; padding:12px;" onclick="encerrarTurnoDefinitivo()">🔴 Encerrar Turno e Fechar Caixa</button>
+            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardTotais')">Voltar / Cancelar</button>
         </div>
 
         <div class="card" id="cardRelatorio" style="display: none;">
             <h2>Relatório de Turno</h2>
             <div class="report-output" id="reportOutput"></div>
             <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir Fechamento</button>
+            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardRelatorio')">Voltar ao Menu</button>
         </div>
     </div>
 </div>
 
-<!-- MODAL DE CONSULTA AVANÇADA (Master) -->
-<div class="modal" id="modalConsultaMaster">
-    <div class="modal-content">
-        <h3>🔎 Consulta Avançada - Master</h3>
-        
-        <div class="aba-consulta">
-            <button onclick="mudarAbaConsulta(1)" id="aba1">Por Cliente</button>
-            <button onclick="mudarAbaConsulta(2)" id="aba2">Por Motorista</button>
-            <button onclick="mudarAbaConsulta(3)" id="aba3">Por Prefixo</button>
-        </div>
-
-        <div class="input-group">
-            <input type="text" id="inputBuscaMaster" placeholder="Digite o nome ou prefixo..." onkeyup="if(event.key==='Enter') buscarMaster()">
-        </div>
-
-        <div id="resultadoConsultaMaster" style="margin-top: 15px; font-size: 13px; line-height: 1.5; max-height: 400px; overflow-y: auto;"></div>
-
-        <div class="modal-buttons">
-            <button class="btn-cancel" onclick="fecharModalConsultaMaster()" style="width:100%;">Fechar</button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal de Lançar Corrida (original) -->
 <div class="modal" id="formModal">
     <div class="modal-content">
         <h3 id="modalTitle">Lançar Corrida</h3>
@@ -265,16 +232,19 @@
 
         <div class="modal-buttons">
             <button class="btn-cancel" onclick="fecharModal()">Voltar</button>
-            <button class="btn-incluir" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
+            <button id="btnConfirmarSalvar" class="btn-incluir" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
         </div>
+        
     </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="cordova.js"></script>
+
 <script src="js/geolocation.js"></script>
 <script src="js/app.js"></script>
 
 </body>
-                                            </html>
+</html>
+
