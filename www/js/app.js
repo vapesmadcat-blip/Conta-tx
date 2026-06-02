@@ -596,14 +596,54 @@ function selecionarTurnoParaVerificacaoMaster() {
 }
 
 function cadastrarNovoMotoristaMaster() {
-    const user = prompt("Nome de usuário para o novo motorista:");
-    if (!user) return;
-    const pass = prompt("Senha para o novo motorista:");
-    if (!pass) return;
-    const tipo = prompt("Tipo de contrato (efetivo/comissionado):", "efetivo");
-    
+    const modal = document.getElementById('modalCadastroMotorista');
+    if (!modal) return alert('Modal de cadastro não encontrado.');
+
+    const campoUser = document.getElementById('novoMotoristaUsuario');
+    const campoSenha = document.getElementById('novoMotoristaSenha');
+    const campoTipo = document.getElementById('novoMotoristaTipo');
+    const campoPrefixo = document.getElementById('novoMotoristaPrefixo');
+
+    if (campoUser) campoUser.value = '';
+    if (campoSenha) campoSenha.value = '';
+    if (campoTipo) campoTipo.value = 'efetivo';
+    if (campoPrefixo) campoPrefixo.value = '';
+
+    modal.style.display = 'flex';
+    setTimeout(() => { if (campoUser) campoUser.focus(); }, 80);
+}
+
+function fecharModalCadastroMotorista() {
+    const modal = document.getElementById('modalCadastroMotorista');
+    if (modal) modal.style.display = 'none';
+}
+
+function salvarNovoMotoristaMaster() {
+    const userRaw = (document.getElementById('novoMotoristaUsuario')?.value || '').trim();
+    const pass = (document.getElementById('novoMotoristaSenha')?.value || '').trim();
+    const tipo = (document.getElementById('novoMotoristaTipo')?.value || 'efetivo').trim().toLowerCase();
+    const prefixo = (document.getElementById('novoMotoristaPrefixo')?.value || '').trim();
+
+    if (!userRaw) return alert('⚠️ Informe o nome de usuário do motorista.');
+    if (!pass) return alert('⚠️ Informe uma senha para o motorista.');
+
+    const user = userRaw.toLowerCase().replace(/\s+/g, '_');
+    const payload = { senha: pass, tipo: tipo };
+    if (prefixo) payload.prefixoCarro = prefixo.toUpperCase();
+
     iniciarFirebaseSeNecessario();
-    db.ref(`usuarios/${user.toLowerCase()}`).set({ senha: pass, tipo: tipo.toLowerCase() }).then(() => alert("Motorista cadastrado!"));
+    db.ref(`usuarios/${user}`).once('value').then(snapshot => {
+        if (snapshot.exists()) {
+            if (!confirm(`⚠️ O usuário "${user}" já existe. Deseja atualizar esse cadastro?`)) return null;
+        }
+        return db.ref(`usuarios/${user}`).set(payload);
+    }).then(resultado => {
+        if (resultado === null) return;
+        fecharModalCadastroMotorista();
+        alert(`✅ Motorista ${user.toUpperCase()} cadastrado com sucesso!`);
+    }).catch(err => {
+        alert('Erro ao cadastrar motorista: ' + err.message);
+    });
 }
 
 function garantirUsuariosBaseNoFirebase() {
@@ -1206,3 +1246,12 @@ window.executarConsultaMasterPeloModal = executarConsultaMasterPeloModal;
 window.onload = () => { 
     checarLicenciamento(); 
 };
+
+
+// Fecha o modal de motorista ao tocar fora da caixa
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('modalCadastroMotorista');
+    if (modal && modal.style.display === 'flex' && e.target === modal) {
+        fecharModalCadastroMotorista();
+    }
+});
