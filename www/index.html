@@ -3,134 +3,278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DriverFlux</title>
+    <title>DriverFlux - Sistema Integrado</title>
     <style>
         :root {
-            --bg-principal: #f8fafc;
+            --bg-principal: #f4f6f9;
             --card-bg: #ffffff;
-            --texto: #1e2937;
-            --texto-secundario: #64748b;
+            --texto: #2d3748;
+            --texto-secundario: #718096;
             --primary: #4f46e5;
             --success: #10b981;
+            --warning: #f59e0b;
             --danger: #ef4444;
-        }
-        [data-theme="dark"] {
-            --bg-principal: #0f172a;
-            --card-bg: #1e2937;
-            --texto: #e2e8f0;
-            --texto-secundario: #94a3b8;
-            --primary: #6366f1;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
         }
 
-        * { margin:0; padding:0; box-sizing:border-box; font-family: system-ui, -apple-system, sans-serif; }
-        body { background: var(--bg-principal); color: var(--texto); line-height: 1.5; }
-        .container { max-width: 500px; margin: 0 auto; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-principal); color: var(--texto); padding: 16px; display: flex; justify-content: center; }
+        .container-central { width: 100%; max-width: 500px; margin-top: 10px; }
+        
+        .card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
+        .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--texto); text-transform: uppercase; }
+        
+        .code-display { background: #edf2f7; border: 2px dashed var(--primary); padding: 15px; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-align: center; border-radius: 12px; margin: 20px 0; }
+        
+        header { text-align: center; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        header h1 { font-size: 24px; font-weight: 800; color: var(--primary); }
+        .user-badge { background: #e0e7ff; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; margin-top: 4px; }
 
-        header { 
-            background: var(--card-bg); 
-            padding: 14px 16px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .menu-btn { font-size: 28px; background: none; border: none; color: var(--primary); padding: 4px; cursor: pointer; }
+        .btn-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        button { border: none; padding: 12px 8px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease; }
+        button:active { transform: scale(0.97); }
 
-        .sidebar { 
-            position: fixed; top: 0; left: -280px; width: 280px; height: 100%; 
-            background: var(--card-bg); box-shadow: 4px 0 20px rgba(0,0,0,0.15); 
-            transition: left 0.3s ease; z-index: 200; padding: 20px; overflow-y: auto;
-        }
-        .sidebar.open { left: 0; }
-
-        .card { background: var(--card-bg); margin: 16px; padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-
-        button { 
-            padding: 12px 16px; border: none; border-radius: 12px; font-weight: 600; 
-            cursor: pointer; width: 100%; margin: 6px 0;
-        }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: var(--success); color: white; }
+        .btn-incluir { background: var(--primary); color: white; }
+        .btn-consultar { background: #4b5563; color: white; }
+        .btn-totais { background: #6366f1; color: white; }
+        .btn-relatorio { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
+        .btn-logout { background: var(--danger); color: white; padding: 8px 14px; font-size: 12px; border-radius: 8px; font-weight: 700; }
+        .btn-cancel { background: #e2e8f0; color: var(--texto); width: 40%; }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 300; align-items: center; justify-content: center; padding: 16px; }
-        .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
+        .input-group { margin-bottom: 14px; }
+        .input-group label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-secundario); margin-bottom: 4px; }
+        .input-group input, .input-group select { width: 100%; padding: 11px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; background: white; }
 
+        .search-container { display: none; margin-bottom: 16px; }
+        .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
+        .search-box input { flex: 1; padding: 12px; border: 2px solid var(--primary); border-radius: 10px; font-size: 15px; outline: none; }
+
+        .client-ledger-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; display: none; }
+        .ledger-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
+        .ledger-row.balance { font-weight: 800; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 8px; }
+
+        .table-wrapper { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { text-align: left; padding: 10px; font-size: 11px; color: var(--texto-secundario); border-bottom: 2px solid #edf2f7; text-transform: uppercase; }
+        td { padding: 12px 10px; font-size: 13px; border-bottom: 1px solid #edf2f7; }
+
+        .result-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .result-row.total-final { margin-top: 14px; padding-top: 14px; border-top: 2px dashed #e2e8f0; font-size: 17px; font-weight: 800; color: var(--primary); }
+        .danger-text { color: var(--danger); font-weight: 600; }
+        .success-text { color: var(--success); font-weight: 600; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+        .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        
+        .report-output { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: none; }
+
+        .aba-consulta { display: flex; gap: 8px; margin-bottom: 16px; }
+        .aba-consulta button { flex: 1; padding: 12px; font-weight: 600; border-radius: 8px; border: none; }
     </style>
 </head>
-<body data-theme="light">
+<body>
 
-<div class="container">
+<div class="container-central">
 
-    <!-- HEADER -->
-    <header>
-        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-        <h1 style="color:var(--primary); font-size:22px; font-weight:800;">DriverFlux</h1>
-        <div>
-            <button onclick="toggleTheme()" style="background:none; font-size:22px; margin-right:8px;">🌓</button>
-            <button class="btn-danger" onclick="efetuarLogout()" style="padding:8px 12px; font-size:13px;">Sair</button>
+    <div id="telaAtivacao" class="card" style="display: none; text-align: center;">
+        <h2>Ativação do Sistema</h2>
+        <div class="code-display" id="txtCodigoDesafio">------</div>
+        <div class="input-group" style="text-align: left;">
+            <label>Digite a Contra-Senha</label>
+            <input type="number" id="inputContraSenha" placeholder="Código de liberação">
         </div>
-    </header>
-
-    <!-- MENU LATERAL -->
-    <div id="sidebar" class="sidebar">
-        <h2>Menu Principal</h2>
-        <button onclick="abrirModalEdicao(null);toggleSidebar()">➕ Incluir Corrida</button>
-        <button onclick="calcularTotais();toggleSidebar()">📊 Fechamento do Turno</button>
-        <button onclick="gerarRelatorio();toggleSidebar()">📄 Relatório Completo</button>
-        <button onclick="alternarBarraConsulta();toggleSidebar()">🔍 Clientes / Amortização</button>
-        <button onclick="abrirModalConsultaMaster();toggleSidebar()" id="btnConsultaMaster" style="display:none; background:#7c3aed; color:white;">🔎 Consulta Avançada (Master)</button>
-        <button onclick="toggleSidebar()">✕ Fechar Menu</button>
+        <button class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
     </div>
 
-    <!-- CONTEÚDO PRINCIPAL -->
-    <div id="conteudoApp" style="display:none;">
-        <div class="card">
-            <h2 id="lblUsuarioAtivo" style="margin-bottom:8px;">Motorista: ---</h2>
-            <div id="lblIdTurnoAtivo" style="font-size:13px; color:var(--texto-secundario);"></div>
+    <div id="telaLogin" class="card" style="display: none;">
+        <h2 style="text-align: center; margin-bottom: 15px;">Acesso ao Turno</h2>
+        <div class="input-group">
+            <label>Identificação / Motorista</label>
+            <input type="text" id="loginUsuario" placeholder="Ex: andre, pedro ou master" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label>Senha de Acesso</label>
+            <input type="password" id="loginSenha" placeholder="******">
+        </div>
+        <button class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
+    </div>
+
+    <div id="telaAberturaTurno" class="card" style="display: none;">
+        <h2>🟢 Abrir Turno e Caixa</h2>
+        <div class="input-group">
+            <label>💰 Dinheiro de Troco Inicial (R$)</label>
+            <input type="number" id="inputTrocoInicial" value="0.00" step="0.01">
+        </div>
+        <div class="input-group">
+            <label>🚗 Hodômetro Inicial (KM Atual do Painel)</label>
+            <input type="number" id="inputKmInicial" placeholder="Ex: 142350">
+        </div>
+        <button class="btn-incluir" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px;" onclick="abrirTurnoOperacional()">Iniciar Trabalho</button>
+    </div>
+
+    <div id="conteudoApp" style="display: none;">
+        <header>
+            <div>
+                <h1>DriverFlux</h1>
+                <span class="user-badge" id="lblUsuarioAtivo">Motorista: ---</span>
+                <div style="font-size: 11px; color: var(--texto-secundario); margin-top: 2px;" id="lblIdTurnoAtivo">Turno: ---</div>
+            </div>
+            <button class="btn-logout" onclick="efetuarLogout()">🚪 Sair</button>
+        </header>
+
+        <div id="painelFiltroMaster" class="card" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe;">
+            <div class="input-group" style="margin-bottom: 0;">
+                <label style="color: var(--primary);">📋 Selecionar Turno para Auditoria:</label>
+                <select id="selectFiltroTurnoMaster" onchange="selecionarTurnoParaVerificacaoMaster()">
+                    <option value="">Carregando histórico de caixas...</option>
+                </select>
+            </div>
+            
+            <!-- === BOTÃO NOVA CONSULTA AVANÇADA === -->
+            <button onclick="abrirModalConsultaMaster()" 
+                    style="width: 100%; margin: 12px 0; padding: 14px; background: #7c3aed; color: white; border: none; border-radius: 10px; font-weight: 700;">
+                🔎 Consulta Avançada (Master)
+            </button>
+            
+            <button class="btn-relatorio" style="width: 100%; background: var(--primary);" onclick="cadastrarNovoMotoristaMaster()">👤 Cadastrar Novo Motorista</button>
         </div>
 
-        <!-- Tabela de corridas -->
+        <div class="btn-grid-actions">
+            <button class="btn-incluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
+            <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
+            <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
+            <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
+        </div>
+
+        <div class="search-container" id="containerPesquisa">
+            <!-- ... seu conteúdo original de pesquisa ... -->
+            <div class="search-box">
+                <input type="text" id="inputPesquisa" placeholder="Buscar cliente no crédito..." list="listaClientesConsulta" oninput="processarConsultaCliente()">
+                <datalist id="listaClientesConsulta"></datalist>
+                <button onclick="limparConsulta()" style="background:#e2e8f0; padding:0 10px; border-radius:10px;">X</button>
+            </div>
+            <div class="client-ledger-box" id="fichaCliente">
+                <h3 id="ledgerNomeCliente" style="font-size:14px; color:var(--primary); margin-bottom:8px;">Extrato</h3>
+                <div class="ledger-row"><span>Acumulado no Crédito:</span> <span id="ledgerTotalDevido">R$ 0,00</span></div>
+                <div class="ledger-row"><span>Total Amortizado:</span> <span id="ledgerTotalPago" class="success-text">R$ 0,00</span></div>
+                <div class="ledger-row balance"><span>Saldo Pendente:</span> <span id="ledgerSaldoFinal">R$ 0,00</span></div>
+                <div style="display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+                    <input type="number" step="0.01" id="inputValorPagamento" placeholder="Valor pago (R$)" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:8px;">
+                    <button class="btn-relatorio" style="padding:8px 12px;" onclick="registrarPagamento()">Amortizar</button>
+                </div>
+            </div>
+        </div>
+
         <div class="card">
-            <h2>Corridas do Turno Atual</h2>
-            <table id="tabelaDados">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Tipo</th>
-                        <th>Cliente</th>
-                        <th>Valor</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <h2 id="tituloTabela">Corridas do Turno Atual</h2>
+            <div class="table-wrapper">
+                <table id="tabelaDados">
+                    <thead>
+                        <tr id="linhaCabecalhoTabela">
+                            <th>ID</th>
+                            <th>Tipo</th>
+                            <th>Info</th>
+                            <th>Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card" id="cardTotais" style="display: none;">
+            <h2>Resumo Financeiro Calculado</h2>
+            <div class="result-row"><span>Fundo/Troco Inicial:</span> <span id="totTrocoInicial">R$ 0,00</span></div>
+            <div class="result-row"><span>Corridas Normais (Dinheiro):</span> <span id="totNormais" class="success-text">R$ 0,00</span></div>
+            <div class="result-row"><span>Corridas no Crédito:</span> <span id="totCorridasCredito">R$ 0,00</span></div>
+            <div class="result-row"><span>Dinheiro Emprestado:</span> <span id="totBruto">R$ 0,00</span></div>
+            <div class="result-row"><span>Taxa do Ponto (+20%):</span> <span id="totAcrescimo" class="danger-text">+ R$ 0,00</span></div>
+            <div class="result-row total-final"><span>Dinheiro Vivo Esperado:</span> <span id="totGeral">R$ 0,00</span></div>
+            
+            <button class="btn-danger" id="btnFecharTurnoOficial" style="width:100%; margin-top:15px; padding:12px;" onclick="encerrarTurnoDefinitivo()">🔴 Encerrar Turno e Fechar Caixa</button>
+        </div>
+
+        <div class="card" id="cardRelatorio" style="display: none;">
+            <h2>Relatório de Turno</h2>
+            <div class="report-output" id="reportOutput"></div>
+            <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir Fechamento</button>
         </div>
     </div>
 </div>
 
-<!-- Modal Consulta Master -->
+<!-- MODAL DE CONSULTA AVANÇADA (Master) -->
 <div class="modal" id="modalConsultaMaster">
     <div class="modal-content">
         <h3>🔎 Consulta Avançada - Master</h3>
-        <div style="display:flex; gap:8px; margin:16px 0;">
-            <button onclick="mudarAbaConsulta(1)" id="aba1" style="flex:1;">Por Cliente</button>
-            <button onclick="mudarAbaConsulta(2)" id="aba2" style="flex:1;">Por Motorista</button>
-            <button onclick="mudarAbaConsulta(3)" id="aba3" style="flex:1;">Por Prefixo</button>
+        
+        <div class="aba-consulta">
+            <button onclick="mudarAbaConsulta(1)" id="aba1">Por Cliente</button>
+            <button onclick="mudarAbaConsulta(2)" id="aba2">Por Motorista</button>
+            <button onclick="mudarAbaConsulta(3)" id="aba3">Por Prefixo</button>
         </div>
-        <input type="text" id="inputBuscaMaster" placeholder="Digite para buscar..." style="width:100%; padding:12px; border-radius:10px; border:2px solid #e2e8f0;" onkeyup="if(event.key==='Enter') buscarMaster()">
-        <div id="resultadoConsultaMaster" style="margin-top:16px; max-height:400px; overflow-y:auto;"></div>
-        <button onclick="fecharModalConsultaMaster()" style="margin-top:20px;">Fechar</button>
+
+        <div class="input-group">
+            <input type="text" id="inputBuscaMaster" placeholder="Digite o nome ou prefixo..." onkeyup="if(event.key==='Enter') buscarMaster()">
+        </div>
+
+        <div id="resultadoConsultaMaster" style="margin-top: 15px; font-size: 13px; line-height: 1.5; max-height: 400px; overflow-y: auto;"></div>
+
+        <div class="modal-buttons">
+            <button class="btn-cancel" onclick="fecharModalConsultaMaster()" style="width:100%;">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Lançar Corrida (original) -->
+<div class="modal" id="formModal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Lançar Corrida</h3>
+        <input type="hidden" id="editId">
+        
+        <div class="input-group">
+            <label for="inputTipoLancamento">Modalidade da Corrida</label>
+            <select id="inputTipoLancamento" onchange="ajustarCamposPorModalidade()">
+                <option value="normal" selected>🟢 Corrida Normal (Paga na Hora)</option>
+                <option value="credito">🟡 Corrida no Crédito (Fiado/Pendência)</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="inputCorrida">Valor da Corrida (R$)</label>
+            <input type="number" step="0.01" id="inputCorrida" placeholder="0,00">
+        </div>
+
+        <div id="camposCreditoOpcionais" style="display: none; background: #f8fafc; padding: 10px; border-radius: 10px; margin-bottom: 14px; border: 1px solid #e2e8f0;">
+            <div class="input-group">
+                <label for="inputCliente">Nome do Cliente</label>
+                <input type="text" id="inputCliente" placeholder="Quem vai dever?" list="listaClientes" autocomplete="off">
+                <datalist id="listaClientes"></datalist>
+            </div>
+            <div class="input-group">
+                <label for="inputWhatsCliente">📱 WhatsApp do Cliente Novo (Com DDD)</label>
+                <input type="number" id="inputWhatsCliente" placeholder="Ex: 51999998888">
+            </div>
+            <div class="input-group" style="margin-bottom:0;">
+                <label for="inputEmprestimo">Adicionar Dinheiro Emprestado (R$)</label>
+                <input type="number" step="0.01" id="inputEmprestimo" value="0">
+            </div>
+        </div>
+
+        <div class="modal-buttons">
+            <button class="btn-cancel" onclick="fecharModal()">Voltar</button>
+            <button class="btn-incluir" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
+        </div>
     </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="cordova.js"></script>
+<script src="js/geolocation.js"></script>
 <script src="js/app.js"></script>
+
 </body>
-</html>
+                                            </html>
