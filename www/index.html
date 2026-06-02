@@ -3,187 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DriverFlux - Sistema Integrado</title>
+    <title>DriverFlux</title>
     <style>
         :root {
-            --bg-principal: #f4f6f9;
+            --bg-principal: #f8fafc;
             --card-bg: #ffffff;
-            --texto: #2d3748;
-            --texto-secundario: #718096;
+            --texto: #1e2937;
+            --texto-secundario: #64748b;
             --primary: #4f46e5;
             --success: #10b981;
-            --warning: #f59e0b;
             --danger: #ef4444;
-            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+        [data-theme="dark"] {
+            --bg-principal: #0f172a;
+            --card-bg: #1e2937;
+            --texto: #e2e8f0;
+            --texto-secundario: #94a3b8;
+            --primary: #6366f1;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-principal); color: var(--texto); padding: 16px; display: flex; justify-content: center; }
-        .container-central { width: 100%; max-width: 500px; margin-top: 10px; }
-        
-        .card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
-        .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--texto); text-transform: uppercase; }
-        
-        .code-display { background: #edf2f7; border: 2px dashed var(--primary); padding: 15px; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-align: center; border-radius: 12px; margin: 20px 0; }
-        
-        header { text-align: center; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        header h1 { font-size: 24px; font-weight: 800; color: var(--primary); }
-        .user-badge { background: #e0e7ff; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; margin-top: 4px; }
+        * { margin:0; padding:0; box-sizing:border-box; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: var(--bg-principal); color: var(--texto); line-height: 1.5; }
+        .container { max-width: 500px; margin: 0 auto; }
 
-        .btn-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-        button { border: none; padding: 12px 8px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease; }
-        button:active { transform: scale(0.97); }
+        header { 
+            background: var(--card-bg); 
+            padding: 14px 16px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .menu-btn { font-size: 28px; background: none; border: none; color: var(--primary); padding: 4px; cursor: pointer; }
 
-        .btn-incluir { background: var(--primary); color: white; }
-        .btn-consultar { background: #4b5563; color: white; }
-        .btn-totais { background: #6366f1; color: white; }
-        .btn-relatorio { background: var(--success); color: white; }
+        .sidebar { 
+            position: fixed; top: 0; left: -280px; width: 280px; height: 100%; 
+            background: var(--card-bg); box-shadow: 4px 0 20px rgba(0,0,0,0.15); 
+            transition: left 0.3s ease; z-index: 200; padding: 20px; overflow-y: auto;
+        }
+        .sidebar.open { left: 0; }
+
+        .card { background: var(--card-bg); margin: 16px; padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+
+        button { 
+            padding: 12px 16px; border: none; border-radius: 12px; font-weight: 600; 
+            cursor: pointer; width: 100%; margin: 6px 0;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
-        .btn-logout { background: var(--danger); color: white; padding: 8px 14px; font-size: 12px; border-radius: 8px; font-weight: 700; }
-        .btn-cancel { background: #e2e8f0; color: var(--texto); width: 40%; }
 
-        .input-group { margin-bottom: 14px; }
-        .input-group label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-secundario); margin-bottom: 4px; }
-        .input-group input, .input-group select { width: 100%; padding: 11px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; background: white; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 300; align-items: center; justify-content: center; padding: 16px; }
+        .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
-        .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
-        
-        .aba-consulta { display: flex; gap: 8px; margin-bottom: 16px; }
-        .aba-consulta button { flex: 1; padding: 12px; font-weight: 600; }
-        
         table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 10px; font-size: 11px; color: var(--texto-secundario); border-bottom: 2px solid #edf2f7; text-transform: uppercase; }
-        td { padding: 12px 10px; font-size: 13px; border-bottom: 1px solid #edf2f7; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
     </style>
 </head>
-<body>
+<body data-theme="light">
 
-<div class="container-central">
+<div class="container">
 
-    <!-- Telas de Ativação, Login e Abertura (mesmas) -->
-    <div id="telaAtivacao" class="card" style="display: none; text-align: center;">
-        <h2>Ativação do Sistema</h2>
-        <div class="code-display" id="txtCodigoDesafio">------</div>
-        <div class="input-group" style="text-align: left;">
-            <label>Digite a Contra-Senha</label>
-            <input type="number" id="inputContraSenha" placeholder="Código de liberação">
+    <!-- HEADER -->
+    <header>
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h1 style="color:var(--primary); font-size:22px; font-weight:800;">DriverFlux</h1>
+        <div>
+            <button onclick="toggleTheme()" style="background:none; font-size:22px; margin-right:8px;">🌓</button>
+            <button class="btn-danger" onclick="efetuarLogout()" style="padding:8px 12px; font-size:13px;">Sair</button>
         </div>
-        <button id="btnAtivar" class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
+    </header>
+
+    <!-- MENU LATERAL -->
+    <div id="sidebar" class="sidebar">
+        <h2>Menu Principal</h2>
+        <button onclick="abrirModalEdicao(null);toggleSidebar()">➕ Incluir Corrida</button>
+        <button onclick="calcularTotais();toggleSidebar()">📊 Fechamento do Turno</button>
+        <button onclick="gerarRelatorio();toggleSidebar()">📄 Relatório Completo</button>
+        <button onclick="alternarBarraConsulta();toggleSidebar()">🔍 Clientes / Amortização</button>
+        <button onclick="abrirModalConsultaMaster();toggleSidebar()" id="btnConsultaMaster" style="display:none; background:#7c3aed; color:white;">🔎 Consulta Avançada (Master)</button>
+        <button onclick="toggleSidebar()">✕ Fechar Menu</button>
     </div>
 
-    <div id="telaLogin" class="card" style="display: none;">
-        <h2 style="text-align: center; margin-bottom: 15px;">Acesso ao Turno</h2>
-        <div class="input-group">
-            <label>Identificação / Motorista</label>
-            <input type="text" id="loginUsuario" placeholder="Ex: andre, pedro ou master" autocomplete="off">
-        </div>
-        <div class="input-group">
-            <label>Senha de Acesso</label>
-            <input type="password" id="loginSenha" placeholder="******">
-        </div>
-        <button id="btnLogin" class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
-    </div>
-
-    <div id="telaAberturaTurno" class="card" style="display: none;">
-        <h2>🟢 Abrir Turno e Caixa</h2>
-        <div class="input-group">
-            <label>💰 Dinheiro de Troco Inicial (R$)</label>
-            <input type="number" id="inputTrocoInicial" value="0.00" step="0.01">
-        </div>
-        <div class="input-group">
-            <label>🚗 Hodômetro Inicial (KM Atual do Painel)</label>
-            <input type="number" id="inputKmInicial" placeholder="Ex: 142350">
-        </div>
-        <button id="btnAbrirTurno" class="btn-incluir" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px;" onclick="abrirTurnoOperacional()">Iniciar Trabalho</button>
-    </div>
-
-    <div id="conteudoApp" style="display: none;">
-        <header>
-            <div>
-                <h1>DriverFlux</h1>
-                <span class="user-badge" id="lblUsuarioAtivo">Motorista: ---</span>
-                <div style="font-size: 11px; color: var(--texto-secundario); margin-top: 2px;" id="lblIdTurnoAtivo">Turno: ---</div>
-            </div>
-            <button class="btn-logout" onclick="efetuarLogout()">🚪 Sair</button>
-        </header>
-
-        <div id="painelFiltroMaster" class="card" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe;">
-            <div class="input-group" style="margin-bottom: 0;">
-                <label style="color: var(--primary);">📋 Selecionar Turno para Auditoria:</label>
-                <select id="selectFiltroTurnoMaster" onchange="selecionarTurnoParaVerificacaoMaster()">
-                    <option value="">Carregando histórico de caixas...</option>
-                </select>
-            </div>
-            
-            <!-- Botão de Consulta Avançada -->
-            <button onclick="abrirModalConsultaMaster()" 
-                    style="width: 100%; margin: 12px 0; padding: 14px; background: #7c3aed; color: white; border: none; border-radius: 10px; font-weight: 700;">
-                🔎 Consulta Avançada (Master)
-            </button>
-            
-            <button class="btn-relatorio" style="width: 100%; background: var(--primary);" onclick="cadastrarNovoMotoristaMaster()">👤 Cadastrar Novo Motorista</button>
-        </div>
-
-        <div class="btn-grid-actions">
-            <button class="btn-incluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
-            <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
-            <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
-            <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
-        </div>
-
-        <!-- Tabela e cards permanecem iguais -->
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div id="conteudoApp" style="display:none;">
         <div class="card">
-            <h2 id="tituloTabela">Corridas do Turno Atual</h2>
-            <div class="table-wrapper">
-                <table id="tabelaDados">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Tipo</th>
-                            <th>Info</th>
-                            <th>Valor</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <h2 id="lblUsuarioAtivo" style="margin-bottom:8px;">Motorista: ---</h2>
+            <div id="lblIdTurnoAtivo" style="font-size:13px; color:var(--texto-secundario);"></div>
         </div>
 
-        <!-- Cards de totais e relatório (mesmo conteúdo anterior) -->
-        <!-- ... (mantidos iguais) ... -->
+        <!-- Tabela de corridas -->
+        <div class="card">
+            <h2>Corridas do Turno Atual</h2>
+            <table id="tabelaDados">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tipo</th>
+                        <th>Cliente</th>
+                        <th>Valor</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-<!-- Modal Consulta Avançada Master -->
+<!-- Modal Consulta Master -->
 <div class="modal" id="modalConsultaMaster">
     <div class="modal-content">
         <h3>🔎 Consulta Avançada - Master</h3>
-        
-        <div class="aba-consulta">
-            <button onclick="mudarAbaConsulta(1)" id="aba1">Por Cliente</button>
-            <button onclick="mudarAbaConsulta(2)" id="aba2">Por Motorista</button>
-            <button onclick="mudarAbaConsulta(3)" id="aba3">Por Prefixo</button>
+        <div style="display:flex; gap:8px; margin:16px 0;">
+            <button onclick="mudarAbaConsulta(1)" id="aba1" style="flex:1;">Por Cliente</button>
+            <button onclick="mudarAbaConsulta(2)" id="aba2" style="flex:1;">Por Motorista</button>
+            <button onclick="mudarAbaConsulta(3)" id="aba3" style="flex:1;">Por Prefixo</button>
         </div>
-
-        <div class="input-group">
-            <input type="text" id="inputBuscaMaster" placeholder="Digite o termo de busca..." onkeyup="if(event.key==='Enter') buscarMaster()">
-        </div>
-
-        <div id="resultadoConsultaMaster" style="margin-top: 15px; font-size: 13px; line-height: 1.5;"></div>
-
-        <div style="margin-top: 20px; text-align: center;">
-            <button class="btn-cancel" onclick="fecharModalConsultaMaster()" style="width: 100%;">Fechar</button>
-        </div>
+        <input type="text" id="inputBuscaMaster" placeholder="Digite para buscar..." style="width:100%; padding:12px; border-radius:10px; border:2px solid #e2e8f0;" onkeyup="if(event.key==='Enter') buscarMaster()">
+        <div id="resultadoConsultaMaster" style="margin-top:16px; max-height:400px; overflow-y:auto;"></div>
+        <button onclick="fecharModalConsultaMaster()" style="margin-top:20px;">Fechar</button>
     </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="cordova.js"></script>
-<script src="js/geolocation.js"></script>
 <script src="js/app.js"></script>
-
 </body>
 </html>
