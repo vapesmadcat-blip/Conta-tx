@@ -528,6 +528,9 @@ function efetuarLogoutPronto() {
 }
 
 function calcularTotais() {
+    const cardRelatorio = document.getElementById('cardRelatorio');
+    if (cardRelatorio) cardRelatorio.style.display = 'none';
+
     let tNormais = 0, tCreditoCorridas = 0, tBrutoEmprestado = 0;
     registros.forEach(r => { 
         if (r.tipo === 'credito') { tCreditoCorridas += r.corrida; tBrutoEmprestado += r.emprestado; } else { tNormais += r.corrida; } 
@@ -654,7 +657,22 @@ function garantirUsuariosBaseNoFirebase() {
 
 function alternarBarraConsulta() {
     const container = document.getElementById('containerPesquisa');
-    if(container) container.style.display = container.style.display === 'none' ? 'block' : 'none';
+    if (!container) return;
+
+    const estaOculto = window.getComputedStyle(container).display === 'none';
+    container.style.display = estaOculto ? 'block' : 'none';
+
+    if (estaOculto) {
+        const input = document.getElementById('inputPesquisa');
+        if (input) {
+            setTimeout(() => {
+                input.focus();
+                mostrarSugestoesPagamento();
+            }, 80);
+        }
+    } else {
+        esconderSugestoesPagamento();
+    }
 }
 
 function obterClientesCreditoUnicos() {
@@ -900,7 +918,13 @@ function processarConsultaCliente(forcarExibicao = false) {
 
 function cancelarFechamento() {
     if (confirm("Deseja realmente voltar sem encerrar o turno?")) {
-        document.getElementById('cardTotais').style.display = 'none';
+        const cardTotais = document.getElementById('cardTotais');
+        const cardRelatorio = document.getElementById('cardRelatorio');
+        const reportOutput = document.getElementById('reportOutput');
+
+        if (cardTotais) cardTotais.style.display = 'none';
+        if (cardRelatorio) cardRelatorio.style.display = 'none';
+        if (reportOutput) reportOutput.innerText = '';
     }
 }
 
