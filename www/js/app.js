@@ -1328,32 +1328,59 @@ function carregarPagamentos() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         const salvo = localStorage.getItem('driverflux_demo_pagamentos');
         pagamentos = salvo ? JSON.parse(salvo) : [];
+        return;
+    }
+
+    pagamentos = [];
+    if (db && idTurnoAtivo) {
+        db.ref(`pagamentos/${idTurnoAtivo}`).once('value').then(snapshot => {
+            const dados = snapshot.val() || {};
+            pagamentos = Object.keys(dados).map(key => ({ fbKey: key, ...dados[key] }));
+            processarConsultaCliente();
+        }).catch(err => {
+            console.warn('Não foi possível carregar pagamentos:', err);
+        });
     }
 }
 
 function salvarPagamento(pagamento) {
+    const jaExiste = pagamentos.some(p => p.id === pagamento.id);
+    if (!jaExiste) pagamentos.push(pagamento);
+
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        pagamentos.push(pagamento);
         localStorage.setItem('driverflux_demo_pagamentos', JSON.stringify(pagamentos));
-    } else if (db && idTurnoAtivo) {
-        db.ref(`pagamentos/${idTurnoAtivo}`).push(pagamento);
+        return Promise.resolve();
     }
+
+    if (db && idTurnoAtivo) {
+        return db.ref(`pagamentos/${idTurnoAtivo}`).push(pagamento).then(ref => {
+            pagamento.fbKey = ref.key;
+        });
+    }
+
+    return Promise.resolve();
 }
 
 function calcularTotalPagoPorCliente(nomeCliente) {
+    const alvo = normalizarTextoConsulta(nomeCliente);
     let total = 0;
     pagamentos.forEach(p => {
-        if (p.cliente && p.cliente.toLowerCase() === nomeCliente.toLowerCase()) {
-            total += parseFloat(p.valor) || 0;
+        if (normalizarTextoConsulta(p.cliente) === alvo) {
+            total += Number(p.valor) || 0;
         }
     });
     return total;
 }
 
+function lerValorMonetarioPagamento(valor) {
+    const limpo = (valor || '').toString().replace(/[^0-9,.-]/g, '').replace(',', '.');
+    return Number(limpo) || 0;
+}
+
 function registrarPagamento() {
     const nomeCliente = document.getElementById('ledgerNomeCliente').innerText.replace('Extrato: ', '').trim();
     const inputValor = document.getElementById('inputValorPagamento');
-    const valorPago = parseFloat(inputValor.value);
+    const valorPago = lerValorMonetarioPagamento(inputValor ? inputValor.value : '');
 
     if (!nomeCliente || !valorPago || valorPago <= 0) {
         alert("⚠️ Digite um valor válido para amortizar.");
@@ -1368,19 +1395,23 @@ function registrarPagamento() {
         cliente: nomeCliente,
         valor: valorPago,
         dataHora: dataHora,
-        turno: idTurnoAtivo || "DEMO"
+        turno: idTurnoAtivo || "DEMO",
+        motorista: motoristaDoTurnoAtual ? motoristaDoTurnoAtual() : usuarioLogado
     };
 
-    salvarPagamento(pagamento);
+    salvarPagamento(pagamento).then(() => {
+        if (inputValor) inputValor.value = '';
+        processarConsultaCliente(true);
+        alert(`✅ Pagamento de ${formatarMoeda(valorPago)} registrado e abatido para ${nomeCliente}!`);
 
-    alert(`✅ Pagamento de ${formatarMoeda(valorPago)} registrado para ${nomeCliente}!`);
-
-    inputValor.value = '';
-    processarConsultaCliente();
-
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        renderToggleAcoesDemo();
-    }
+        if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+            renderToggleAcoesDemo();
+        }
+    }).catch(err => {
+        pagamentos = pagamentos.filter(p => p.id !== pagamento.id);
+        processarConsultaCliente(true);
+        alert('❌ Não foi possível salvar o pagamento: ' + err.message);
+    });
 }
 
 function processarConsultaCliente(forcarExibicao = false) {
