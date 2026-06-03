@@ -923,6 +923,131 @@ function gerarRelatorio() {
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+
+function montarHtmlRelatorioParaImpressao() {
+    const output = document.getElementById('reportOutput');
+    if (!output || !output.innerHTML.trim()) return '';
+
+    const estilos = Array.from(document.querySelectorAll('style'))
+        .map(style => style.innerHTML)
+        .join('\n');
+
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório DriverFlux</title>
+<style>
+${estilos}
+body { background: #ffffff !important; padding: 12px !important; }
+.container-central { max-width: 100% !important; }
+.report-pro { box-shadow: none !important; }
+.no-print, button { display: none !important; }
+@media print {
+    body, html { background: #ffffff !important; padding: 0 !important; margin: 0 !important; }
+    * { visibility: visible !important; }
+}
+</style>
+</head>
+<body>
+${output.innerHTML}
+<script>
+window.onload = function() {
+    setTimeout(function(){ window.focus(); window.print(); }, 400);
+};
+<\/script>
+</body>
+</html>`;
+}
+
+function imprimirRelatorioPDF() {
+    const html = montarHtmlRelatorioParaImpressao();
+    if (!html) {
+        alert('Gere o relatório antes de imprimir ou salvar em PDF.');
+        return;
+    }
+
+    try {
+        const frame = document.createElement('iframe');
+        frame.style.position = 'fixed';
+        frame.style.right = '0';
+        frame.style.bottom = '0';
+        frame.style.width = '1px';
+        frame.style.height = '1px';
+        frame.style.border = '0';
+        document.body.appendChild(frame);
+
+        const doc = frame.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+
+        setTimeout(() => {
+            try {
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+            } catch (e) {
+                abrirRelatorioEmNovaJanela(html);
+            }
+            setTimeout(() => frame.remove(), 5000);
+        }, 700);
+    } catch (e) {
+        abrirRelatorioEmNovaJanela(html);
+    }
+
+    setTimeout(() => {
+        alert('Se a tela de impressão abrir, escolha “Salvar em PDF”. Se não abrir neste aparelho, use o botão “Salvar/Compartilhar”.');
+    }, 900);
+}
+
+function abrirRelatorioEmNovaJanela(html) {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const janela = window.open(url, '_blank');
+    if (!janela) {
+        location.href = url;
+    }
+}
+
+async function salvarRelatorioComoArquivo() {
+    const html = montarHtmlRelatorioParaImpressao();
+    if (!html) {
+        alert('Gere o relatório antes de salvar ou compartilhar.');
+        return;
+    }
+
+    const agora = new Date();
+    const nomeArquivo = 'relatorio-driverflux-' + agora.toISOString().slice(0, 10) + '.html';
+    const arquivo = new File([html], nomeArquivo, { type: 'text/html' });
+
+    try {
+        if (navigator.canShare && navigator.canShare({ files: [arquivo] }) && navigator.share) {
+            await navigator.share({
+                title: 'Relatório DriverFlux',
+                text: 'Relatório de turno DriverFlux',
+                files: [arquivo]
+            });
+            return;
+        }
+    } catch (e) {}
+
+    try {
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nomeArquivo;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        alert('Arquivo do relatório gerado. Se o Android perguntar, escolha a pasta Downloads.');
+    } catch (e) {
+        abrirRelatorioEmNovaJanela(html);
+    }
+}
+
 function fecharRelatorioProfissional() {
     const card = document.getElementById('cardRelatorio');
     const output = document.getElementById('reportOutput');
