@@ -681,7 +681,8 @@ function renderizarTabela() {
     const tbody = document.querySelector('#tabelaDados tbody'); 
     if (!tbody) return;
     tbody.innerHTML = '';
-    registros.forEach(reg => {
+    const listaHistorico = [...registros].sort((a, b) => obterTimestampRegistro(b) - obterTimestampRegistro(a)).slice(0, 10);
+    listaHistorico.forEach(reg => {
         const tr = document.createElement('tr');
         const descTipo = reg.tipo === 'credito' ? '🟡 Crédito' : '🟢 Normal';
         const descCliente = reg.tipo === 'credito' ? (reg.cliente || 'N/I') : 'Passageiro Balcão';
@@ -970,6 +971,87 @@ function selecionarClientePagamento(nome) {
 }
 
 
+function obterTimestampRegistro(reg) {
+    if (!reg) return 0;
+    if (reg.timestamp) {
+        const n = Number(reg.timestamp);
+        if (!isNaN(n)) return n;
+    }
+    const dataTexto = (reg.dataHora || reg.data || '').toString().trim();
+    if (!dataTexto) return Number(reg.id) || 0;
+    const m = dataTexto.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) {
+        const d = Number(m[1]);
+        const mo = Number(m[2]) - 1;
+        const y = Number(m[3]);
+        const h = Number(m[4] || 0);
+        const mi = Number(m[5] || 0);
+        const se = Number(m[6] || 0);
+        return new Date(y, mo, d, h, mi, se).getTime();
+    }
+    const parsed = Date.parse(dataTexto);
+    return isNaN(parsed) ? (Number(reg.id) || 0) : parsed;
+}
+
+function dataIsoLocal(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function formatarDataIsoRelatorio(iso) {
+    if (!iso) return '';
+    const partes = iso.split('-');
+    if (partes.length !== 3) return iso;
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+function aplicarPeriodoRelatorio(dias) {
+    const fim = new Date();
+    const inicio = new Date();
+    inicio.setDate(fim.getDate() - (Number(dias) - 1));
+    const inputIni = document.getElementById('relDataInicial');
+    const inputFim = document.getElementById('relDataFinal');
+    if (inputIni) inputIni.value = dataIsoLocal(inicio);
+    if (inputFim) inputFim.value = dataIsoLocal(fim);
+    gerarRelatorio();
+}
+
+function limparPeriodoRelatorio() {
+    const inputIni = document.getElementById('relDataInicial');
+    const inputFim = document.getElementById('relDataFinal');
+    if (inputIni) inputIni.value = '';
+    if (inputFim) inputFim.value = '';
+    gerarRelatorio();
+}
+
+function obterFiltroPeriodoRelatorio() {
+    const ini = (document.getElementById('relDataInicial')?.value || '').trim();
+    const fim = (document.getElementById('relDataFinal')?.value || '').trim();
+    const inicioMs = ini ? new Date(`${ini}T00:00:00`).getTime() : null;
+    const fimMs = fim ? new Date(`${fim}T23:59:59`).getTime() : null;
+    return { ini, fim, inicioMs, fimMs };
+}
+
+function filtrarPorPeriodoRelatorio(lista, periodo) {
+    if (!periodo || (!periodo.inicioMs && !periodo.fimMs)) return [...lista];
+    return lista.filter(item => {
+        const ts = obterTimestampRegistro(item);
+        if (!ts) return false;
+        if (periodo.inicioMs && ts < periodo.inicioMs) return false;
+        if (periodo.fimMs && ts > periodo.fimMs) return false;
+        return true;
+    });
+}
+
+function descricaoPeriodoRelatorio(periodo) {
+    if (!periodo || (!periodo.ini && !periodo.fim)) return 'Todo o turno';
+    if (periodo.ini && periodo.fim) return `${formatarDataIsoRelatorio(periodo.ini)} até ${formatarDataIsoRelatorio(periodo.fim)}`;
+    if (periodo.ini) return `A partir de ${formatarDataIsoRelatorio(periodo.ini)}`;
+    return `Até ${formatarDataIsoRelatorio(periodo.fim)}`;
+}
+
 function numeroSeguro(valor) {
     const n = parseFloat(valor);
     return isNaN(n) ? 0 : n;
@@ -1056,6 +1138,9 @@ function gerarRelatorio() {
     const porCliente = {};
     const porMotorista = {};
     const porPrefixo = {};
+    const periodo = obterFiltroPeriodoRelatorio();
+    const registrosRelatorio = filtrarPorPeriodoRelatorio(registros, periodo).sort((a, b) => obterTimestampRegistro(b) - obterTimestampRegistro(a));
+    const pagamentosRelatorio = filtrarPorPeriodoRelatorio(pagamentos || [], periodo);
 
     const motoristaAtivo = (usuarioLogado || metadadosTurno.motorista || 'Não informado').toString().toUpperCase();
     const prefixoAtivo = (metadadosTurno.prefixoCarro || localStorage.getItem('driverflux_demo_prefixo') || 'N/I').toString().toUpperCase();
@@ -1082,11 +1167,12 @@ function gerarRelatorio() {
     });
 
     const totalCreditoComJuros = tCreditoCorridas + tEmprestado + tJuros;
-    const totalPago = (pagamentos || []).reduce((acc, p) => acc + numeroSeguro(p.valor), 0);
+    const totalPago = pagamentosRelatorio.reduce((acc, p) => acc + numeroSeguro(p.valor), 0);
     const saldoPendente = Math.max(totalCreditoComJuros - totalPago, 0);
     const producaoTotal = tNormais + totalCreditoComJuros;
     const dinheiroEsperado = fundo + tNormais + totalPago;
     const dataGeracao = new Date().toLocaleString('pt-BR');
+    const periodoTexto = descricaoPeriodoRelatorio(periodo);
 
     output.innerHTML = `
         <div class="report-pro">
@@ -1095,12 +1181,13 @@ function gerarRelatorio() {
                 <p>
                     Motorista: <b>${escaparHtmlRelatorio(motoristaAtivo)}</b> • Prefixo: <b>${escaparHtmlRelatorio(prefixoAtivo)}</b><br>
                     Turno: ${escaparHtmlRelatorio(idTurnoAtivo || metadadosTurno.id || 'DEMO')} • Abertura: ${escaparHtmlRelatorio(metadadosTurno.abertura || 'N/I')}<br>
+                    Período: <b>${escaparHtmlRelatorio(periodoTexto)}</b><br>
                     Gerado em: ${escaparHtmlRelatorio(dataGeracao)}
                 </p>
             </div>
 
             <div class="report-grid">
-                <div class="report-card primary"><div class="label">Corridas</div><div class="value">${registros.length}</div></div>
+                <div class="report-card primary"><div class="label">Corridas</div><div class="value">${registrosRelatorio.length}</div></div>
                 <div class="report-card success"><div class="label">Produção total</div><div class="value">${formatarMoeda(producaoTotal)}</div></div>
                 <div class="report-card"><div class="label">Dinheiro + amortizações</div><div class="value">${formatarMoeda(dinheiroEsperado)}</div></div>
                 <div class="report-card warning"><div class="label">Crédito lançado</div><div class="value">${formatarMoeda(totalCreditoComJuros)}</div></div>
@@ -1135,7 +1222,7 @@ function gerarRelatorio() {
 
             <div class="report-section">
                 <h4>Detalhamento das Corridas</h4>
-                ${linhasTabelaCorridasRelatorio(registros)}
+                ${linhasTabelaCorridasRelatorio(registrosRelatorio)}
             </div>
         </div>`;
 
