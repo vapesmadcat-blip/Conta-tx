@@ -112,6 +112,16 @@
         .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         
+
+        .report-filter-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; margin-bottom:12px; }
+        .report-filter-title { font-size:13px; font-weight:900; color:#334155; margin-bottom:8px; }
+        .report-quick-buttons { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:10px; }
+        .report-quick-buttons button { background:#e0e7ff; color:#3730a3; font-weight:900; padding:10px 6px; }
+        .report-date-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .report-date-grid label { font-size:11px; font-weight:800; color:#64748b; display:block; margin-bottom:4px; }
+        .report-date-grid input { width:100%; padding:10px; border:2px solid #e2e8f0; border-radius:10px; font-size:14px; }
+        .report-filter-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+        .history-note { font-size:12px; color:#64748b; font-weight:700; margin: -4px 0 10px; }
         .report-output { display: none; }
         .report-pro { background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; }
         .report-head { background:linear-gradient(135deg, #4f46e5, #111827); color:white; padding:18px; }
@@ -244,7 +254,8 @@
 
         <!-- TABELA DE CORRIDAS -->
         <div class="card">
-            <h2 id="tituloTabela">Corridas do Turno Atual</h2>
+            <h2 id="tituloTabela">Últimas 10 corridas</h2>
+            <div class="history-note">Mais recentes primeiro. O relatório continua considerando o período selecionado.</div>
             <div class="table-wrapper">
                 <table id="tabelaDados">
                     <thead>
@@ -284,6 +295,28 @@
 
         <div class="card" id="cardRelatorio" style="display: none;">
             <h2>Relatório Profissional de Turno</h2>
+            <div class="report-filter-box no-print">
+                <div class="report-filter-title">📅 Período do relatório</div>
+                <div class="report-quick-buttons">
+                    <button type="button" onclick="aplicarPeriodoRelatorio(7)">7 dias</button>
+                    <button type="button" onclick="aplicarPeriodoRelatorio(15)">15 dias</button>
+                    <button type="button" onclick="aplicarPeriodoRelatorio(30)">30 dias</button>
+                </div>
+                <div class="report-date-grid">
+                    <div>
+                        <label>Data inicial</label>
+                        <input type="date" id="relDataInicial">
+                    </div>
+                    <div>
+                        <label>Data final</label>
+                        <input type="date" id="relDataFinal">
+                    </div>
+                </div>
+                <div class="report-filter-actions">
+                    <button type="button" class="btn-relatorio" onclick="gerarRelatorio()">Gerar relatório</button>
+                    <button type="button" style="background:#e2e8f0; color:#334155;" onclick="limparPeriodoRelatorio()">Tudo</button>
+                </div>
+            </div>
             <div class="report-output" id="reportOutput"></div>
             <div class="report-toolbar no-print">
                 <button class="btn-relatorio" onclick="imprimirRelatorioPDF()">🖨️ Imprimir / PDF</button>
