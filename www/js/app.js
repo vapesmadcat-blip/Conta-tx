@@ -33,6 +33,53 @@ let motoristasCadastroMaster = {};
 
 const LIMITE_DEMO = 10;
 
+
+function motoristaDoTurnoAtual() {
+    return ((metadadosTurno && metadadosTurno.motorista) || usuarioLogado || '').toString().trim().toLowerCase();
+}
+
+function masterEstaNoProprioTurno() {
+    if (usuarioLogado !== 'master') return true;
+    return motoristaDoTurnoAtual() === 'master';
+}
+
+function bloquearMasterForaDoProprioTurno(acao) {
+    if (usuarioLogado === 'master' && !masterEstaNoProprioTurno()) {
+        alert(`🔒 Segurança operacional:\n\nO usuário MASTER está visualizando o turno de ${motoristaDoTurnoAtual().toUpperCase() || 'outro motorista'}.\n\nNeste modo ele pode consultar, auditar e gerar relatório, mas não pode ${acao || 'alterar corridas'} nesse turno.\n\nPara lançar corrida, selecione/abra um turno do próprio MASTER.`);
+        return true;
+    }
+    return false;
+}
+
+function normalizarTelefoneBrasil(numero) {
+    let n = (numero || '').toString().replace(/\D/g, '');
+    if (!n) return '';
+    if (n.startsWith('55') && n.length >= 12) return n;
+    return '55' + n;
+}
+
+async function copiarTextoDriverFlux(texto, mensagemSucesso) {
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(texto);
+            alert(mensagemSucesso || 'Texto copiado.');
+            return true;
+        }
+    } catch(e) {}
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e) {}
+    ta.remove();
+    alert(ok ? (mensagemSucesso || 'Texto copiado.') : 'Não consegui copiar automaticamente. O texto ficou disponível para seleção.');
+    return ok;
+}
+
 function obterSenhaDefinitiva(desafio) { return (parseInt(desafio) * 13) + 6182; }
 function obterSenhaDemo(desafio) { return (parseInt(desafio) * 11) + 3947; }
 
@@ -179,6 +226,7 @@ function renderToggleAcoesDemo() {
 }
 
 function abrirModalEdicao(id) { 
+    if (bloquearMasterForaDoProprioTurno(id === null ? 'incluir corrida' : 'editar corrida')) return;
     if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) { alert("🔒 Edição de registros bloqueada no modo de demonstração."); return; }
 
     if (id === null) {
@@ -328,6 +376,7 @@ function abrirTurnoOperacional() {
 async function salvarDados() {
     const btn = document.getElementById('btnConfirmarSalvar');
     if (btn && btn.disabled) return;
+    if (bloquearMasterForaDoProprioTurno('salvar corrida')) return;
     if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Salvando..."; }
 
     // Validar se há turno ativo
@@ -415,33 +464,116 @@ function finalizarSalvamento(dados, whats) {
     if (dados.tipo === 'credito') { prepararDisparoReciboNativo(dados, whats); }
 }
 
-function prepararDisparoReciboNativo(reg, whatsappSugerido) {
-    let txtMensagem = "";
+function montarTextoReciboDriverFlux(reg) {
     let localizacaoGps = reg.gps || "Não capturado";
     let pfxRecibo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
+    const valorCorrida = numeroSeguro(reg.corrida);
+    const emprestado = numeroSeguro(reg.emprestado);
+    const juros = emprestado * 0.20;
+    const totalDevido = valorCorrida + emprestado + juros;
+    const cliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente : "Passageiro Avulso";
 
     if (reg.tipo === 'credito') {
-        const totalDevido = reg.corrida + (reg.emprestado * 1.20);
-        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente}\n💰 *Corrida:* R$ ${reg.corrida.toFixed(2)}\n🏦 *Empréstimo:* R$ ${reg.emprestado.toFixed(2)}\n📊 *Total com Juros (20%):* R$ ${totalDevido.toFixed(2)}\n📍 *Localização:* ${localizacaoGps}\n-----------------------------------------`;
-    } else {
-        let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
-        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n👤 *CLIENTE:* ${descCliente}\n💰 *VALOR DA CORRIDA:* R$ ${reg.corrida.toFixed(2)}\n📅 *DATA/HORA:* ${reg.dataHora}\n📍 *LOCALIZAÇÃO GPS:* ${localizacaoGps}\n=========================================\nObrigado pela preferência!`;
+        return `🧾 *RECIBO DE CORRIDA - DRIVERFLUX*\n` +
+               `-----------------------------------------\n` +
+               `🚖 *Prefixo:* ${pfxRecibo}\n` +
+               `📅 *Data/Hora:* ${reg.dataHora || 'N/I'}\n` +
+               `👤 *Cliente:* ${cliente}\n` +
+               `💰 *Corrida:* R$ ${valorCorrida.toFixed(2)}\n` +
+               `🏦 *Empréstimo:* R$ ${emprestado.toFixed(2)}\n` +
+               `📈 *Taxa 20%:* R$ ${juros.toFixed(2)}\n` +
+               `✅ *Total devido:* R$ ${totalDevido.toFixed(2)}\n` +
+               `📍 *GPS/Local:* ${localizacaoGps}\n` +
+               `-----------------------------------------\n` +
+               `Obrigado pela preferência.`;
     }
 
-    if (!whatsappSugerido && reg.tipo === 'credito') return;
+    return `🧾 *RECIBO DE CORRIDA - DRIVERFLUX*\n` +
+           `-----------------------------------------\n` +
+           `🚖 *Prefixo:* ${pfxRecibo}\n` +
+           `📅 *Data/Hora:* ${reg.dataHora || 'N/I'}\n` +
+           `👤 *Cliente:* ${cliente}\n` +
+           `💰 *Valor pago:* R$ ${valorCorrida.toFixed(2)}\n` +
+           `📍 *GPS/Local:* ${localizacaoGps}\n` +
+           `-----------------------------------------\n` +
+           `Obrigado pela preferência.`;
+}
 
-    let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
-    if (confirmarEnvio) {
-        let destino = whatsappSugerido;
-        if (!destino || destino === "51") {
-            destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", "51");
-        }
-        
-        if (!destino || destino === "51" || destino.length < 10) return alert("⚠️ Operação cancelada ou número inválido.");
-        
-        let urlWhats = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
-        window.location.href = urlWhats;
+function textoReciboParaHtml(texto) {
+    return texto
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\*/g, '')
+        .replace(/\n/g, '<br>');
+}
+
+function garantirModalReciboDriverFlux() {
+    let modal = document.getElementById('modalReciboDriverFlux');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'modalReciboDriverFlux';
+    modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(15,23,42,.72); z-index:9999; padding:18px; align-items:center; justify-content:center;';
+    modal.innerHTML = `
+        <div style="background:white; width:min(520px, 96vw); max-height:88vh; overflow-y:auto; border-radius:20px; box-shadow:0 22px 70px rgba(0,0,0,.35);">
+            <div style="background:linear-gradient(135deg,#0f172a,#2563eb); color:white; padding:16px; border-radius:20px 20px 0 0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <div>
+                    <h3 style="margin:0; font-size:18px;">🧾 Recibo da Corrida</h3>
+                    <p style="margin:4px 0 0 0; opacity:.88; font-size:12px;">Confira, copie, imprima ou envie pelo WhatsApp</p>
+                </div>
+                <button onclick="fecharModalReciboDriverFlux()" style="background:rgba(255,255,255,.18); color:white; border:1px solid rgba(255,255,255,.35); border-radius:10px; padding:8px 10px; font-weight:900;">✕</button>
+            </div>
+            <div style="padding:16px;">
+                <div id="reciboPreviewDriverFlux" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:14px; line-height:1.55; color:#0f172a; font-size:14px;"></div>
+                <input id="reciboTelefoneDriverFlux" type="tel" placeholder="WhatsApp com DDD, só números" style="width:100%; margin-top:12px; padding:13px; border:2px solid #e2e8f0; border-radius:12px; font-size:15px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;">
+                    <button onclick="enviarReciboWhatsAppDriverFlux()" style="padding:13px; border:none; border-radius:12px; background:#25d366; color:white; font-weight:900;">💬 WhatsApp</button>
+                    <button onclick="copiarReciboDriverFlux()" style="padding:13px; border:none; border-radius:12px; background:#0f766e; color:white; font-weight:900;">📋 Copiar</button>
+                    <button onclick="imprimirReciboDriverFlux()" style="padding:13px; border:none; border-radius:12px; background:#2563eb; color:white; font-weight:900;">🖨️ Imprimir/PDF</button>
+                    <button onclick="fecharModalReciboDriverFlux()" style="padding:13px; border:none; border-radius:12px; background:#e2e8f0; color:#334155; font-weight:900;">Fechar</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    return modal;
+}
+
+let reciboAtualDriverFlux = '';
+
+function prepararDisparoReciboNativo(reg, whatsappSugerido) {
+    reciboAtualDriverFlux = montarTextoReciboDriverFlux(reg);
+    const modal = garantirModalReciboDriverFlux();
+    const preview = document.getElementById('reciboPreviewDriverFlux');
+    const telefone = document.getElementById('reciboTelefoneDriverFlux');
+    if (preview) preview.innerHTML = textoReciboParaHtml(reciboAtualDriverFlux);
+    if (telefone) telefone.value = (whatsappSugerido && whatsappSugerido !== '51') ? whatsappSugerido.replace(/\D/g, '') : '';
+    modal.style.display = 'flex';
+}
+
+function fecharModalReciboDriverFlux() {
+    const modal = document.getElementById('modalReciboDriverFlux');
+    if (modal) modal.style.display = 'none';
+}
+
+function enviarReciboWhatsAppDriverFlux() {
+    const telefone = document.getElementById('reciboTelefoneDriverFlux');
+    const numero = normalizarTelefoneBrasil(telefone ? telefone.value : '');
+    if (!numero || numero.length < 12) {
+        alert('⚠️ Informe o WhatsApp com DDD para enviar o recibo.');
+        if (telefone) telefone.focus();
+        return;
     }
+    window.location.href = `whatsapp://send?phone=${numero}&text=${encodeURIComponent(reciboAtualDriverFlux)}`;
+}
+
+function copiarReciboDriverFlux() {
+    copiarTextoDriverFlux(reciboAtualDriverFlux, '✅ Recibo copiado. Agora você pode colar no WhatsApp ou em outro aplicativo.');
+}
+
+function imprimirReciboDriverFlux() {
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Recibo DriverFlux</title><style>body{font-family:Arial,sans-serif;padding:18px;color:#0f172a}.recibo{max-width:420px;margin:auto;border:1px solid #e2e8f0;border-radius:14px;padding:16px;line-height:1.55}h2{margin-top:0}</style></head><body><div class="recibo"><h2>🧾 Recibo DriverFlux</h2>${textoReciboParaHtml(reciboAtualDriverFlux)}</div><script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script></body></html>`;
+    abrirRelatorioEmNovaJanela(html);
+    alert('Se a tela de impressão abrir, escolha “Salvar em PDF”.');
 }
 
 function emititNotaFiscalWhatsApp(idCorrida) {
@@ -1019,6 +1151,7 @@ async function salvarRelatorioComoArquivo() {
 
     const agora = new Date();
     const nomeArquivo = 'relatorio-driverflux-' + agora.toISOString().slice(0, 10) + '.html';
+    const textoResumo = (document.getElementById('reportOutput')?.innerText || 'Relatório DriverFlux').trim();
     const arquivo = new File([html], nomeArquivo, { type: 'text/html' });
 
     try {
@@ -1028,9 +1161,12 @@ async function salvarRelatorioComoArquivo() {
                 text: 'Relatório de turno DriverFlux',
                 files: [arquivo]
             });
+            alert('✅ Relatório enviado para o menu de compartilhamento do Android. Se você escolheu Drive, WhatsApp ou Arquivos, procure nele.');
             return;
         }
-    } catch (e) {}
+    } catch (e) {
+        alert('⚠️ O compartilhamento foi cancelado ou bloqueado pelo Android. Vou tentar gerar um arquivo para download.');
+    }
 
     try {
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
@@ -1042,8 +1178,9 @@ async function salvarRelatorioComoArquivo() {
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 3000);
-        alert('Arquivo do relatório gerado. Se o Android perguntar, escolha a pasta Downloads.');
+        alert('✅ Relatório gerado como HTML. No Android, procure em Downloads/Arquivos recentes. Para PDF verdadeiro, use “Imprimir/PDF” e escolha “Salvar em PDF”.');
     } catch (e) {
+        await copiarTextoDriverFlux(textoResumo, '✅ Não consegui salvar arquivo neste aparelho, mas copiei o relatório em texto para você colar/salvar.');
         abrirRelatorioEmNovaJanela(html);
     }
 }
