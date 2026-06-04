@@ -1731,23 +1731,47 @@ function abrirRelatorioEmNovaJanela(html) {
 }
 
 async function salvarRelatorioComoArquivo() {
+    const html = montarHtmlRelatorioParaImpressao();
+    if (!html) {
+        alert('Gere o relatório antes de salvar ou compartilhar.');
+        return;
+    }
+
+    const agora = new Date();
+    const nomeArquivo = 'relatorio-driverflux-' + agora.toISOString().slice(0, 10) + '.html';
+    const textoResumo = (document.getElementById('reportOutput')?.innerText || 'Relatório DriverFlux').trim();
+    const arquivo = new File([html], nomeArquivo, { type: 'text/html' });
+
     try {
-        const output = document.getElementById('reportOutput');
-        const texto = (output?.innerText || '').trim();
-        if (!texto) return alert('Gere o relatório antes de salvar.');
-
-        const html = (typeof montarHtmlRelatorioParaImpressao === 'function') ? montarHtmlRelatorioParaImpressao() : montarHtmlDriverFluxGenerico('Driver Flux - Relatório', output?.innerHTML || '', texto);
-        const nome = 'DriverFlux_Relatorio_Turno_' + timestampArquivoDriverFluxMs() + '.html';
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-
-        await salvarOuCompartilharBlobDriverFlux(blob, nome, 'Relatório Driver Flux', texto);
+        if (navigator.canShare && navigator.canShare({ files: [arquivo] }) && navigator.share) {
+            await navigator.share({
+                title: 'Relatório DriverFlux',
+                text: 'Relatório de turno DriverFlux',
+                files: [arquivo]
+            });
+            alert('✅ Relatório enviado para o menu de compartilhamento do Android. Se você escolheu Drive, WhatsApp ou Arquivos, procure nele.');
+            return;
+        }
     } catch (e) {
-        console.error('Erro ao salvar relatório:', e);
-        alert('❌ Erro ao salvar relatório: ' + (e.message || e));
+        alert('⚠️ O compartilhamento foi cancelado ou bloqueado pelo Android. Vou tentar gerar um arquivo para download.');
+    }
+
+    try {
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nomeArquivo;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        alert('✅ Relatório gerado como HTML. No Android, procure em Downloads/Arquivos recentes. Para PDF verdadeiro, use “Imprimir/PDF” e escolha “Salvar em PDF”.');
+    } catch (e) {
+        await copiarTextoDriverFlux(textoResumo, '✅ Não consegui salvar arquivo neste aparelho, mas copiei o relatório em texto para você colar/salvar.');
+        abrirRelatorioEmNovaJanela(html);
     }
 }
-
-
 
 function fecharRelatorioProfissional() {
     const card = document.getElementById('cardRelatorio');
@@ -2308,7 +2332,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// ==================== BACKUP / RESTAURAÇÃO + PDF + COMPARTILHAMENTO DRIVER FLUX ====================
+// ==================== BACKUP / RESTAURAÇÃO + EXPORTAÇÃO DRIVER FLUX ====================
 
 function timestampArquivoDriverFlux() {
     const d = new Date();
@@ -2316,337 +2340,199 @@ function timestampArquivoDriverFlux() {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
 }
 
+function montarHtmlExportacaoDriverFlux(titulo, conteudoHtml, textoFallback) {
+    const estilos = Array.from(document.querySelectorAll('style'))
+        .map(style => style.innerHTML)
+        .join('\n');
 
-function timestampArquivoDriverFluxMs() {
-    return String(new Date().getTime());
-}
+    const corpo = conteudoHtml && conteudoHtml.trim()
+        ? conteudoHtml
+        : `<pre>${(textoFallback || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</pre>`;
 
-function montarHtmlDriverFluxGenerico(titulo, conteudoHtml, textoFallback) {
-    const conteudo = (conteudoHtml || '').trim();
-    const texto = (textoFallback || '').trim();
-    const corpo = conteudo || ('<pre>' + escaparHtmlDriverFlux(texto || 'Sem dados para exibir.') + '</pre>');
     return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${escaparHtmlDriverFlux(titulo || 'Driver Flux')}</title>
+<title>${titulo || 'Driver Flux'}</title>
 <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #111827; background: #ffffff; }
-    .cabecalho { border-bottom: 3px solid #0f172a; padding-bottom: 12px; margin-bottom: 18px; }
-    h1 { margin: 0; font-size: 24px; }
-    .sub { color: #475569; margin-top: 6px; font-size: 13px; }
-    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
-    th { background: #f1f5f9; }
-    .card, .relatorio-card, .df-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin: 10px 0; }
-    .valor, .total, strong { font-weight: 700; }
-    pre { white-space: pre-wrap; font-family: Arial, sans-serif; line-height: 1.45; }
-    @media print { body { margin: 12mm; } button { display: none !important; } }
+${estilos}
+body { background:#ffffff !important; padding:16px !important; font-family:Arial, sans-serif; color:#111827; }
+.driverflux-export-header { border-bottom:2px solid #111827; margin-bottom:16px; padding-bottom:10px; }
+.driverflux-export-header h1 { margin:0; font-size:22px; }
+.driverflux-export-header small { color:#475569; }
+button, .no-print { display:none !important; }
+@media print { body { margin:0; padding:8px !important; } }
 </style>
 </head>
 <body>
-<div class="cabecalho">
-    <h1>${escaparHtmlDriverFlux(titulo || 'Driver Flux')}</h1>
-    <div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+<div class="driverflux-export-header">
+<h1>${titulo || 'Driver Flux'}</h1>
+<small>Gerado em ${new Date().toLocaleString('pt-BR')}</small>
 </div>
 ${corpo}
-<script>window.onload = function(){ setTimeout(function(){ try { window.print(); } catch(e) {} }, 500); };</script>
 </body>
 </html>`;
 }
 
-function limparTextoPDFDriverFlux(texto) {
-    return (texto || '').toString()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
-        .replace(/[–—]/g, '-')
-        .replace(/[•]/g, '-')
-        .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
-        .replace(/[^\x09\x0A\x0D\x20-\x7EÀ-ÿ]/g, '');
+function montarHtmlRelatorioParaImpressaoSeguroDriverFlux(idOutput, titulo) {
+    const output = document.getElementById(idOutput);
+    const texto = (output?.innerText || '').trim();
+    if (!output || (!output.innerHTML.trim() && !texto)) return '';
+    return montarHtmlExportacaoDriverFlux(titulo || 'Relatório Driver Flux', output.innerHTML, texto);
 }
 
-function escaparPDFDriverFlux(texto) {
-    return limparTextoPDFDriverFlux(texto).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
-function quebrarLinhaPDFDriverFlux(linha, maxChars) {
-    linha = limparTextoPDFDriverFlux(linha).replace(/\s+/g, ' ').trim();
-    if (!linha) return [''];
-    const partes = [];
-    let atual = '';
-    linha.split(' ').forEach(palavra => {
-        if ((atual + ' ' + palavra).trim().length > maxChars) {
-            if (atual) partes.push(atual);
-            atual = palavra;
-        } else {
-            atual = (atual + ' ' + palavra).trim();
+function pedirPermissaoArquivosDriverFlux() {
+    return new Promise(resolve => {
+        if (!window.cordova || !window.cordova.plugins || !cordova.plugins.permissions) {
+            resolve(true);
+            return;
         }
-    });
-    if (atual) partes.push(atual);
-    return partes;
-}
 
-function criarPDFTextoDriverFlux(titulo, texto) {
-    const largura = 595.28;
-    const altura = 841.89;
-    const margem = 42;
-    const fonte = 10;
-    const entrelinha = 14;
-    const maxLinhas = Math.floor((altura - margem * 2 - 30) / entrelinha);
-    const linhasOriginais = limparTextoPDFDriverFlux(texto || '').split(/\r?\n/);
-    const linhas = [];
-    linhas.push(titulo || 'Driver Flux');
-    linhas.push('Gerado em: ' + new Date().toLocaleString('pt-BR'));
-    linhas.push('');
-    linhasOriginais.forEach(l => quebrarLinhaPDFDriverFlux(l, 86).forEach(q => linhas.push(q)));
+        const permissions = cordova.plugins.permissions;
+        const lista = [];
+        if (permissions.WRITE_EXTERNAL_STORAGE) lista.push(permissions.WRITE_EXTERNAL_STORAGE);
+        if (permissions.READ_EXTERNAL_STORAGE) lista.push(permissions.READ_EXTERNAL_STORAGE);
+        if (!lista.length) {
+            resolve(true);
+            return;
+        }
 
-    const paginas = [];
-    for (let i = 0; i < linhas.length; i += maxLinhas) paginas.push(linhas.slice(i, i + maxLinhas));
-    if (!paginas.length) paginas.push(['Driver Flux', 'Sem conteudo para gerar.']);
-
-    const objetos = [];
-    function addObj(conteudo) { objetos.push(conteudo); return objetos.length; }
-
-    const fontObj = addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-    const pageKids = [];
-
-    paginas.forEach((pag, idx) => {
-        let y = altura - margem;
-        let stream = 'BT\n/F1 ' + fonte + ' Tf\n';
-        pag.forEach((linha, lineIdx) => {
-            const size = (idx === 0 && lineIdx === 0) ? 15 : fonte;
-            stream += `/F1 ${size} Tf\n1 0 0 1 ${margem} ${y.toFixed(2)} Tm (${escaparPDFDriverFlux(linha)}) Tj\n`;
-            y -= (lineIdx === 0 && idx === 0) ? 20 : entrelinha;
+        permissions.checkPermission(lista[0], status => {
+            if (status && status.hasPermission) {
+                resolve(true);
+                return;
+            }
+            permissions.requestPermissions(lista, st => resolve(!!(st && st.hasPermission)), () => resolve(false));
+        }, () => {
+            permissions.requestPermissions(lista, st => resolve(!!(st && st.hasPermission)), () => resolve(false));
         });
-        stream += 'ET';
-        const contentObj = addObj('<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream');
-        const pageObj = addObj('<< /Type /Page /Parent 0 0 R /MediaBox [0 0 ' + largura + ' ' + altura + '] /Resources << /Font << /F1 ' + fontObj + ' 0 R >> >> /Contents ' + contentObj + ' 0 R >>');
-        pageKids.push(pageObj);
-    });
-
-    const pagesObjIndex = objetos.length + 1;
-    pageKids.forEach(pageObjNum => {
-        objetos[pageObjNum - 1] = objetos[pageObjNum - 1].replace('/Parent 0 0 R', '/Parent ' + pagesObjIndex + ' 0 R');
-    });
-    const pagesObj = addObj('<< /Type /Pages /Kids [' + pageKids.map(n => n + ' 0 R').join(' ') + '] /Count ' + pageKids.length + ' >>');
-    const catalogObj = addObj('<< /Type /Catalog /Pages ' + pagesObj + ' 0 R >>');
-
-    let pdf = '%PDF-1.4\n';
-    const offsets = [0];
-    objetos.forEach((obj, i) => {
-        offsets.push(pdf.length);
-        pdf += (i + 1) + ' 0 obj\n' + obj + '\nendobj\n';
-    });
-    const xref = pdf.length;
-    pdf += 'xref\n0 ' + (objetos.length + 1) + '\n0000000000 65535 f \n';
-    for (let i = 1; i <= objetos.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
-    pdf += 'trailer\n<< /Size ' + (objetos.length + 1) + ' /Root ' + catalogObj + ' 0 R >>\nstartxref\n' + xref + '\n%%EOF';
-    return new Blob([pdf], { type: 'application/pdf' });
-}
-
-function blobParaDataUrlDriverFlux(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
     });
 }
 
-function escreverBlobEmArquivoCordovaDriverFlux(blob, nomeArquivo) {
-    return new Promise((resolve, reject) => {
+function salvarBlobEmDownloadsDriverFlux(blob, nomeArquivo) {
+    return new Promise(async (resolve, reject) => {
         if (!window.cordova || !window.resolveLocalFileSystemURL || !window.cordova.file) {
-            reject(new Error('Cordova File nao disponivel'));
+            reject(new Error('Cordova File não disponível. Recompile o APK com cordova-plugin-file.'));
             return;
         }
 
-        const pasta = cordova.file.externalCacheDirectory || cordova.file.cacheDirectory || cordova.file.dataDirectory;
-        if (!pasta) {
-            reject(new Error('Pasta temporaria do app nao disponivel'));
+        const permitido = await pedirPermissaoArquivosDriverFlux();
+        if (!permitido) {
+            reject(new Error('Permissão para salvar arquivos negada pelo Android.'));
             return;
         }
 
-        window.resolveLocalFileSystemURL(pasta, dirEntry => {
-            dirEntry.getFile(nomeArquivo, { create: true, exclusive: false }, fileEntry => {
-                fileEntry.createWriter(writer => {
-                    writer.onwriteend = () => resolve({
-                        nativeURL: fileEntry.nativeURL,
-                        cdvURL: fileEntry.toURL(),
-                        fullPath: fileEntry.fullPath,
-                        name: nomeArquivo
+        const candidatos = [
+            (cordova.file.externalRootDirectory || '') + 'Download/',
+            (cordova.file.externalRootDirectory || '') + 'Downloads/',
+            cordova.file.externalDataDirectory || '',
+            cordova.file.dataDirectory || ''
+        ].filter(Boolean);
+
+        let ultimoErro = null;
+
+        const tentarPasta = index => {
+            if (index >= candidatos.length) {
+                reject(ultimoErro || new Error('Nenhuma pasta disponível para salvar.'));
+                return;
+            }
+
+            const pasta = candidatos[index];
+            window.resolveLocalFileSystemURL(pasta, dirEntry => {
+                dirEntry.getFile(nomeArquivo, { create: true, exclusive: false }, fileEntry => {
+                    fileEntry.createWriter(fileWriter => {
+                        fileWriter.onwriteend = () => resolve({
+                            pasta,
+                            nomeArquivo,
+                            nativeURL: fileEntry.nativeURL,
+                            cdvURL: fileEntry.toURL(),
+                            caminhoVisivel: pasta.includes('/Download') || pasta.includes('/Downloads')
+                                ? 'Downloads/' + nomeArquivo
+                                : nomeArquivo
+                        });
+                        fileWriter.onerror = err => {
+                            ultimoErro = err;
+                            tentarPasta(index + 1);
+                        };
+                        fileWriter.write(blob);
+                    }, err => {
+                        ultimoErro = err;
+                        tentarPasta(index + 1);
                     });
-                    writer.onerror = err => reject(err);
-                    writer.write(blob);
-                }, reject);
-            }, reject);
-        }, reject);
-    });
-}
-
-function compartilharArquivoCordovaDriverFlux(fileInfo, titulo, texto) {
-    return new Promise((resolve, reject) => {
-        if (!window.plugins || !window.plugins.socialsharing) {
-            reject(new Error('Plugin de compartilhamento nao disponivel'));
-            return;
-        }
-        const arquivo = fileInfo?.nativeURL || fileInfo?.cdvURL || fileInfo;
-        const options = {
-            message: titulo || 'Arquivo Driver Flux',
-            subject: titulo || 'Driver Flux',
-            files: [arquivo],
-            chooserTitle: 'Salvar ou compartilhar arquivo Driver Flux'
+                }, err => {
+                    ultimoErro = err;
+                    tentarPasta(index + 1);
+                });
+            }, err => {
+                ultimoErro = err;
+                tentarPasta(index + 1);
+            });
         };
-        const ok = () => resolve(true);
-        const fail = err => reject(err || new Error('Compartilhamento cancelado'));
-        if (window.plugins.socialsharing.shareWithOptions) {
-            window.plugins.socialsharing.shareWithOptions(options, ok, fail);
-        } else {
-            window.plugins.socialsharing.share(texto || titulo || 'Arquivo Driver Flux', titulo || 'Driver Flux', arquivo, null, ok, fail);
-        }
+
+        tentarPasta(0);
     });
 }
 
-
-function aguardarCordovaProntoDriverFlux(ms = 2500) {
-    return new Promise(resolve => {
-        if (!window.cordova) return resolve(false);
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            setTimeout(() => resolve(true), 80);
-        } else {
-            let done = false;
-            const finalizar = v => { if (!done) { done = true; resolve(v); } };
-            document.addEventListener('deviceready', () => finalizar(true), { once: true });
-            setTimeout(() => finalizar(!!window.cordova), ms);
-        }
-    });
+function salvarBlobNavegadorDriverFlux(blob, nomeArquivo) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
-function comTimeoutDriverFlux(promise, ms, valorTimeout) {
-    return new Promise(resolve => {
-        let done = false;
-        const timer = setTimeout(() => {
-            if (!done) { done = true; resolve(valorTimeout); }
-        }, ms);
-        Promise.resolve(promise).then(v => {
-            if (!done) { done = true; clearTimeout(timer); resolve(v); }
-        }).catch(e => {
-            if (!done) { done = true; clearTimeout(timer); resolve(valorTimeout || { erro: e.message || String(e) }); }
-        });
-    });
-}
-
-async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, textoFallback) {
-    const erros = [];
-    await aguardarCordovaProntoDriverFlux();
-
-    // 1) Caminho principal no APK: grava arquivo temporário real e abre o compartilhamento do Android.
+async function salvarArquivoDriverFlux(blob, nomeArquivo, titulo, textoFallback) {
     try {
-        const fileInfo = await escreverBlobEmArquivoCordovaDriverFlux(blob, nomeArquivo);
-        const arquivo = fileInfo?.nativeURL || fileInfo?.cdvURL || fileInfo?.fullPath;
-        if (!arquivo) throw new Error('Arquivo temporário criado sem caminho utilizável');
-        await compartilharArquivoCordovaDriverFlux(fileInfo, titulo || nomeArquivo, 'Arquivo gerado pelo Driver Flux: ' + nomeArquivo);
-        alert('✅ Arquivo enviado ao Android: ' + nomeArquivo + '\n\nEscolha o destino: Drive, Arquivos, WhatsApp, Gmail ou outro app.');
+        const info = await salvarBlobEmDownloadsDriverFlux(blob, nomeArquivo);
+        alert('✅ ' + (titulo || 'Arquivo') + ' salvo com sucesso.\n\nArquivo:\n' + nomeArquivo + '\n\nLocal provável:\n' + info.caminhoVisivel);
         return true;
-    } catch (cordovaErro) {
-        erros.push('Cordova/share: ' + (cordovaErro?.message || JSON.stringify(cordovaErro) || cordovaErro));
-        console.warn('Falha no compartilhamento Cordova:', cordovaErro);
+    } catch (erroCordova) {
+        console.warn('Falha ao salvar via Cordova:', erroCordova);
     }
 
-    // 2) Fallback: Web Share API com File nomeado corretamente.
     try {
-        const arquivo = new File([blob], nomeArquivo, { type: blob.type || 'application/octet-stream' });
-        if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [arquivo] }))) {
-            await navigator.share({ title: titulo || nomeArquivo, text: titulo || nomeArquivo, files: [arquivo] });
-            alert('✅ Arquivo enviado ao compartilhamento do Android: ' + nomeArquivo);
-            return true;
-        } else {
-            erros.push('WebShare: navegador/WebView não aceita compartilhar arquivo');
-        }
-    } catch (webShareErro) {
-        erros.push('WebShare: ' + (webShareErro?.message || webShareErro));
-        console.warn('Falha no Web Share:', webShareErro);
-    }
-
-    // 3) Fallback: download por Blob URL. Funciona em navegador; alguns WebViews ignoram.
-    try {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = nomeArquivo;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-        link.remove();
-        alert('✅ Tentei salvar como: ' + nomeArquivo + '\n\nSe não abriu nada, este Android bloqueou download interno do WebView.');
+        salvarBlobNavegadorDriverFlux(blob, nomeArquivo);
+        alert('✅ Arquivo gerado: ' + nomeArquivo + '\n\nSe estiver no navegador, procure em Downloads.');
         return true;
-    } catch (blobErro) {
-        erros.push('BlobURL: ' + (blobErro?.message || blobErro));
-        console.warn('Falha no Blob URL:', blobErro);
+    } catch (erroDownload) {
+        console.warn('Falha no download via navegador:', erroDownload);
     }
 
-    // 4) Fallback extra: data URL.
-    try {
-        const dataUrl = await blobParaDataUrlDriverFlux(blob);
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = nomeArquivo;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        alert('✅ Tentei abrir o arquivo: ' + nomeArquivo + '\n\nSe não apareceu seletor, use o conteúdo copiado como plano B.');
-        return true;
-    } catch (dataErro) {
-        erros.push('DataURL: ' + (dataErro?.message || dataErro));
-        console.warn('Falha no data URL:', dataErro);
-    }
-
-    // 5) Último recurso: copia o conteúdo textual. Para PDF, copia relatório; para backup, copia o JSON inteiro.
     if (textoFallback) {
-        await copiarTextoDriverFlux(textoFallback, '⚠️ Não consegui abrir o salvamento, mas copiei o conteúdo. Cole em um arquivo com o nome: ' + nomeArquivo);
+        await copiarTextoDriverFlux(textoFallback, 'Não consegui salvar o arquivo, mas copiei o conteúdo em texto.');
     }
-    alert('❌ O Android/WebView bloqueou salvar ou compartilhar o arquivo.\n\nNome desejado: ' + nomeArquivo + '\n\nErros:\n- ' + erros.join('\n- '));
+    alert('❌ Não consegui salvar o arquivo neste aparelho. Verifique permissões de arquivos do Driver Flux.');
     return false;
 }
 
 async function salvarRelatorioComoArquivo() {
-    try {
-        const output = document.getElementById('reportOutput');
-        const texto = (output?.innerText || '').trim();
-        if (!texto) return alert('Gere o relatório antes de salvar.');
+    const output = document.getElementById('reportOutput');
+    const texto = (output?.innerText || '').trim();
+    if (!texto) return alert('Gere o relatório antes de salvar.');
 
-        const html = (typeof montarHtmlRelatorioParaImpressao === 'function') ? montarHtmlRelatorioParaImpressao() : montarHtmlDriverFluxGenerico('Driver Flux - Relatório', output?.innerHTML || '', texto);
-        const nome = 'DriverFlux_Relatorio_Turno_' + timestampArquivoDriverFluxMs() + '.html';
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const nome = 'DriverFlux_Relatorio_' + timestampArquivoDriverFlux() + '.html';
+    const html = montarHtmlRelatorioParaImpressaoSeguroDriverFlux('reportOutput', 'Relatório Driver Flux');
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
 
-        await salvarOuCompartilharBlobDriverFlux(blob, nome, 'Relatório Driver Flux', texto);
-    } catch (e) {
-        console.error('Erro ao salvar relatório:', e);
-        alert('❌ Erro ao salvar relatório: ' + (e.message || e));
-    }
+    await salvarArquivoDriverFlux(blob, nome, 'Relatório Driver Flux', texto);
 }
-
 
 async function salvarRelatorioDespesasPDF() {
-    try {
-        const output = document.getElementById('reportDespesasOutput');
-        const texto = (output?.innerText || '').trim();
-        if (!texto) return alert('Gere o relatório de despesas antes de salvar.');
+    const output = document.getElementById('reportDespesasOutput');
+    const texto = (output?.innerText || '').trim();
+    if (!texto) return alert('Gere o relatório de despesas antes de salvar.');
 
-        const html = montarHtmlDriverFluxGenerico('Driver Flux - Relatório de Despesas', output?.innerHTML || '', texto);
-        const nome = 'DriverFlux_Relatorio_Despesas_' + timestampArquivoDriverFluxMs() + '.html';
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const nome = 'DriverFlux_Relatorio_Despesas_' + timestampArquivoDriverFlux() + '.html';
+    const html = montarHtmlRelatorioParaImpressaoSeguroDriverFlux('reportDespesasOutput', 'Relatório de Despesas Driver Flux');
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
 
-        await salvarOuCompartilharBlobDriverFlux(blob, nome, 'Relatório de Despesas Driver Flux', texto);
-    } catch (e) {
-        console.error('Erro ao salvar relatório de despesas:', e);
-        alert('❌ Erro ao salvar relatório de despesas: ' + (e.message || e));
-    }
+    await salvarArquivoDriverFlux(blob, nome, 'Relatório de Despesas Driver Flux', texto);
 }
-
-
 
 function montarLocalStorageBackupDriverFlux() {
     const dados = {};
@@ -2658,61 +2544,41 @@ function montarLocalStorageBackupDriverFlux() {
 }
 
 async function coletarFirebaseBackupDriverFlux() {
-    try {
-        if (localStorage.getItem('driverflux_modo_demo') === 'true') return null;
-        if (typeof db === 'undefined' || !db) iniciarFirebaseSeNecessario();
-        if (typeof db === 'undefined' || !db) return null;
-        const paths = ['usuarios', 'turnos_operacionais', 'corridas_por_turno', 'pagamentos', 'despesas_por_turno'];
-        const out = {};
-        for (const path of paths) {
-            try {
-                const snap = await db.ref(path).once('value');
-                out[path] = snap.val() || null;
-            } catch (e) {
-                out[path] = { erro: e.message || String(e) };
-            }
+    if (localStorage.getItem('driverflux_modo_demo') === 'true' || !db) return null;
+    iniciarFirebaseSeNecessario();
+    const paths = ['usuarios', 'turnos_operacionais', 'corridas_por_turno', 'pagamentos', 'despesas_por_turno'];
+    const out = {};
+    for (const path of paths) {
+        try {
+            const snap = await db.ref(path).once('value');
+            out[path] = snap.val() || null;
+        } catch (e) {
+            out[path] = { erro: e.message || String(e) };
         }
-        return out;
-    } catch (e) {
-        console.warn('Backup Firebase ignorado:', e);
-        return { erro: e.message || String(e) };
     }
+    return out;
 }
 
 async function fazerBackupDriverFlux() {
-    try {
-        const backup = {
-            app: 'Driver Flux',
-            produto: 'Driver Flux',
-            versaoBackup: 5,
-            geradoEm: new Date().toISOString(),
-            usuario: (typeof usuarioLogado !== 'undefined' && usuarioLogado) ? usuarioLogado : (localStorage.getItem('driverflux_usuario_logado') || 'nao_informado'),
-            turnoAtivo: (typeof idTurnoAtivo !== 'undefined' && idTurnoAtivo) ? idTurnoAtivo : '',
-            metadadosTurno: (typeof metadadosTurno !== 'undefined' && metadadosTurno) ? metadadosTurno : {},
-            localStorage: montarLocalStorageBackupDriverFlux(),
-            dadosAtuais: {
-                registros: (typeof registros !== 'undefined' && Array.isArray(registros)) ? registros : [],
-                pagamentos: (typeof pagamentos !== 'undefined' && Array.isArray(pagamentos)) ? pagamentos : [],
-                despesasTurno: (typeof despesasTurno !== 'undefined' && Array.isArray(despesasTurno)) ? despesasTurno : [],
-                motoristasCadastroMaster: (typeof motoristasCadastroMaster !== 'undefined') ? motoristasCadastroMaster : {}
-            },
-            firebase: null
-        };
+    const backup = {
+        app: 'Driver Flux',
+        produto: 'Driver Flux',
+        versaoBackup: 3,
+        geradoEm: new Date().toISOString(),
+        usuario: usuarioLogado || localStorage.getItem('driverflux_usuario_logado') || 'nao informado',
+        turnoAtivo: idTurnoAtivo || '',
+        metadadosTurno: metadadosTurno || {},
+        localStorage: montarLocalStorageBackupDriverFlux(),
+        dadosAtuais: { registros, pagamentos, despesasTurno, motoristasCadastroMaster },
+        firebase: await coletarFirebaseBackupDriverFlux()
+    };
 
-        backup.firebase = await comTimeoutDriverFlux(coletarFirebaseBackupDriverFlux(), 2500, { aviso: 'Firebase ignorado por timeout para nao travar o backup.' });
+    const json = JSON.stringify(backup, null, 2);
+    const nome = 'DriverFlux_Backup_' + timestampArquivoDriverFlux() + '.json';
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
 
-        const json = JSON.stringify(backup, null, 2);
-        const nome = 'DriverFlux_Backup_' + timestampArquivoDriverFluxMs() + '.json';
-        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-
-        await salvarOuCompartilharBlobDriverFlux(blob, nome, 'Backup Driver Flux', json);
-    } catch (e) {
-        console.error('Erro no backup Driver Flux:', e);
-        alert('❌ Erro ao gerar backup: ' + (e.message || e));
-    }
+    await salvarArquivoDriverFlux(blob, nome, 'Backup Driver Flux', json);
 }
-
-
 
 function abrirImportarBackupDriverFlux() {
     const input = document.getElementById('inputBackupDriverFlux');
