@@ -231,6 +231,7 @@
             <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
             <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
             <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
+            <button class="btn-relatorio" style="background:#0f766e; color:white;" onclick="abrirRelatorioDespesas()">📋 Rel. Despesa</button>
         </div>
 
         <!-- BARRA DE PESQUISA DE CLIENTES -->
@@ -345,6 +346,46 @@
                 <button class="btn-relatorio" onclick="imprimirRelatorioPDF()">🖨️ Imprimir / PDF</button>
                 <button class="btn-relatorio" style="background:#0f766e; color:white;" onclick="salvarRelatorioComoArquivo()">💾 Salvar/Compartilhar</button>
                 <button style="background:#64748b; color:white;" onclick="fecharRelatorioProfissional()">Fechar</button>
+            </div>
+        </div>
+
+        <div class="card" id="cardRelatorioDespesas" style="display: none;">
+            <h2>Relatório de Despesas por Prefixo</h2>
+            <div class="report-filter-box no-print">
+                <div class="report-filter-title">🚖 Prefixo do carro</div>
+                <div class="report-date-grid">
+                    <div>
+                        <label>Prefixo / placa</label>
+                        <input type="text" id="relDespesaPrefixo" placeholder="Ex: TX-024">
+                    </div>
+                    <div>
+                        <label>Período rápido</label>
+                        <div class="report-quick-buttons">
+                            <button type="button" onclick="aplicarPeriodoRelatorioDespesa(7)">7 dias</button>
+                            <button type="button" onclick="aplicarPeriodoRelatorioDespesa(15)">15 dias</button>
+                            <button type="button" onclick="aplicarPeriodoRelatorioDespesa(30)">30 dias</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-date-grid">
+                    <div>
+                        <label>Data inicial</label>
+                        <input type="date" id="relDespesaDataInicial">
+                    </div>
+                    <div>
+                        <label>Data final</label>
+                        <input type="date" id="relDespesaDataFinal">
+                    </div>
+                </div>
+                <div class="report-filter-actions">
+                    <button type="button" class="btn-relatorio" onclick="gerarRelatorioDespesas()">Gerar despesas</button>
+                    <button type="button" style="background:#e2e8f0; color:#334155;" onclick="limparPeriodoRelatorioDespesa()">Tudo</button>
+                </div>
+            </div>
+            <div class="report-output" id="reportDespesasOutput"></div>
+            <div class="report-toolbar no-print">
+                <button class="btn-relatorio" onclick="copiarRelatorioDespesas()">📋 Copiar</button>
+                <button style="background:#64748b; color:white;" onclick="fecharRelatorioDespesas()">Fechar</button>
             </div>
         </div>
     </div>
