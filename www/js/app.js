@@ -2422,18 +2422,77 @@ function criarPDFTextoDriverFlux(titulo, texto) {
     return new Blob([pdf], { type: 'application/pdf' });
 }
 
-async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, textoFallback) {
-    const arquivo = new File([blob], nomeArquivo, { type: blob.type || 'application/octet-stream' });
-    try {
-        if (navigator.canShare && navigator.canShare({ files: [arquivo] }) && navigator.share) {
-            await navigator.share({ title: titulo || nomeArquivo, text: titulo || nomeArquivo, files: [arquivo] });
-            alert('✅ Arquivo enviado para o compartilhamento do Android. Escolha Drive, WhatsApp, Arquivos ou outro destino.');
-            return true;
+function escreverBlobEmArquivoCordovaDriverFlux(blob, nomeArquivo) {
+    return new Promise((resolve, reject) => {
+        if (!window.cordova || !window.resolveLocalFileSystemURL || !window.cordova.file) {
+            reject(new Error('Cordova File não disponível'));
+            return;
         }
-    } catch (e) {
-        alert('⚠️ Compartilhamento cancelado ou bloqueado. Vou tentar salvar como download.');
+
+        const pasta = cordova.file.cacheDirectory || cordova.file.externalCacheDirectory || cordova.file.dataDirectory;
+        if (!pasta) {
+            reject(new Error('Pasta temporária do app não disponível'));
+            return;
+        }
+
+        window.resolveLocalFileSystemURL(pasta, dirEntry => {
+            dirEntry.getFile(nomeArquivo, { create: true, exclusive: false }, fileEntry => {
+                fileEntry.createWriter(writer => {
+                    writer.onwriteend = () => resolve(fileEntry.nativeURL || fileEntry.toURL());
+                    writer.onerror = err => reject(err);
+                    writer.write(blob);
+                }, reject);
+            }, reject);
+        }, reject);
+    });
+}
+
+function compartilharArquivoCordovaDriverFlux(caminhoArquivo, titulo, texto) {
+    return new Promise((resolve, reject) => {
+        if (!window.plugins || !window.plugins.socialsharing) {
+            reject(new Error('Plugin de compartilhamento não disponível'));
+            return;
+        }
+
+        window.plugins.socialsharing.share(
+            texto || titulo || 'Arquivo DriverFlux',
+            titulo || 'DriverFlux',
+            caminhoArquivo,
+            null,
+            () => resolve(true),
+            err => reject(err || new Error('Compartilhamento cancelado'))
+        );
+    });
+}
+
+async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, textoFallback) {
+    // Melhor caminho para APK/Cordova: grava em cache interno e abre a folha de compartilhamento do Android.
+    try {
+        const caminho = await escreverBlobEmArquivoCordovaDriverFlux(blob, nomeArquivo);
+        await compartilharArquivoCordovaDriverFlux(
+            caminho,
+            titulo || nomeArquivo,
+            'Arquivo gerado pelo DriverFlux: ' + nomeArquivo
+        );
+        alert('✅ Arquivo gerado. Escolha o destino no Android: Drive, Arquivos, WhatsApp, Gmail ou outro app.');
+        return true;
+    } catch (cordovaErro) {
+        console.warn('Falha no compartilhamento Cordova:', cordovaErro);
     }
 
+    // Fallback para navegador/PWA.
+    try {
+        const arquivo = new File([blob], nomeArquivo, { type: blob.type || 'application/octet-stream' });
+        if (navigator.canShare && navigator.canShare({ files: [arquivo] }) && navigator.share) {
+            await navigator.share({ title: titulo || nomeArquivo, text: titulo || nomeArquivo, files: [arquivo] });
+            alert('✅ Arquivo enviado para o compartilhamento do Android.');
+            return true;
+        }
+    } catch (webShareErro) {
+        console.warn('Falha no Web Share:', webShareErro);
+    }
+
+    // Último fallback: download tradicional. Em WebView pode não funcionar, mas funciona no navegador.
     try {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -2443,10 +2502,12 @@ async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, tex
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 4000);
-        alert('✅ Arquivo gerado. Procure em Downloads, Arquivos recentes ou na pasta escolhida pelo Android.');
+        alert('✅ Arquivo gerado. Se não abrir o compartilhamento, procure em Downloads ou teste pelo navegador.');
         return true;
-    } catch (e) {
+    } catch (downloadErro) {
+        console.warn('Falha no download:', downloadErro);
         if (textoFallback) await copiarTextoDriverFlux(textoFallback, 'Não consegui salvar arquivo, mas copiei o conteúdo em texto.');
+        alert('❌ Não consegui abrir o salvamento neste aparelho. Conteúdo copiado como texto quando possível.');
         return false;
     }
 }
@@ -2510,6 +2571,20 @@ async function fazerBackupDriverFlux() {
     const json = JSON.stringify(backup, null, 2);
     const nome = 'backup-driverflux-' + new Date().toISOString().slice(0, 10) + '.json';
     const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+
+    const resumo = [
+        '💾 Backup DriverFlux pronto',
+        '',
+        'Arquivo: ' + nome,
+        'Clientes/usuários locais: ' + Object.keys(backup.localStorage || {}).length,
+        'Corridas carregadas no turno atual: ' + (registros?.length || 0),
+        'Pagamentos carregados: ' + (pagamentos?.length || 0),
+        'Despesas carregadas: ' + (despesasTurno?.length || 0),
+        '',
+        'Agora escolha onde salvar/mandar: Drive, Arquivos, WhatsApp, Gmail, etc.'
+    ].join('\n');
+    alert(resumo);
+
     await salvarOuCompartilharBlobDriverFlux(blob, nome, 'Backup DriverFlux', json);
 }
 
