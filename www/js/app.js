@@ -2405,13 +2405,16 @@ function escreverBlobEmArquivoCordovaDriverFlux(blob, nomeArquivo) {
             return;
         }
 
-        const pasta = cordova.file.cacheDirectory || cordova.file.externalCacheDirectory || cordova.file.dataDirectory;
-        if (!pasta) {
-            reject(new Error('Pasta temporaria do app nao disponivel'));
+        // Prioriza pasta mais visível para o usuário (Android/data/<pacote>/files/DriverFlux/)
+        // Isso facilita encontrar o arquivo manualmente se o compartilhamento falhar.
+        const pastaPreferida = cordova.file.externalDataDirectory || cordova.file.externalCacheDirectory || cordova.file.dataDirectory || cordova.file.cacheDirectory;
+
+        if (!pastaPreferida) {
+            reject(new Error('Nenhuma pasta de armazenamento disponível no dispositivo'));
             return;
         }
 
-        window.resolveLocalFileSystemURL(pasta, dirEntry => {
+        const criarESalvar = (dirEntry) => {
             dirEntry.getFile(nomeArquivo, { create: true, exclusive: false }, fileEntry => {
                 fileEntry.createWriter(writer => {
                     writer.onwriteend = () => resolve({
@@ -2424,7 +2427,33 @@ function escreverBlobEmArquivoCordovaDriverFlux(blob, nomeArquivo) {
                     writer.write(blob);
                 }, reject);
             }, reject);
-        }, reject);
+        };
+
+        const tentarComSubpasta = (baseDir) => {
+            // Tenta criar subpasta "DriverFlux" para organizar os arquivos gerados pelo app
+            baseDir.getDirectory('DriverFlux', { create: true, exclusive: false }, subDir => {
+                criarESalvar(subDir);
+            }, err => {
+                // Se não conseguir criar subpasta, salva direto na raiz da pasta preferida
+                console.warn('Não foi possível criar subpasta DriverFlux, salvando direto:', err);
+                criarESalvar(baseDir);
+            });
+        };
+
+        window.resolveLocalFileSystemURL(pastaPreferida, dirEntry => {
+            tentarComSubpasta(dirEntry);
+        }, err => {
+            // Fallback para cache se a pasta preferida falhar
+            console.warn('Falha ao acessar pasta preferida, tentando cache:', err);
+            const fallbackPasta = cordova.file.cacheDirectory || cordova.file.dataDirectory;
+            if (fallbackPasta) {
+                window.resolveLocalFileSystemURL(fallbackPasta, dirEntry => {
+                    criarESalvar(dirEntry);
+                }, reject);
+            } else {
+                reject(err);
+            }
+        });
     });
 }
 
@@ -2456,7 +2485,7 @@ async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, tex
     try {
         const fileInfo = await escreverBlobEmArquivoCordovaDriverFlux(blob, nomeArquivo);
         await compartilharArquivoCordovaDriverFlux(fileInfo, titulo || nomeArquivo, 'Arquivo gerado pelo Driver Flux: ' + nomeArquivo);
-        alert('✅ Arquivo pronto: ' + nomeArquivo + '\n\nEscolha o destino no Android: Drive, Arquivos, WhatsApp, Gmail ou outro app.');
+        alert('✅ Arquivo gerado com sucesso!\n\nNome: ' + nomeArquivo + '\n\nO Android vai abrir a caixa de seleção agora.\nEscolha "Salvar" ou um app como Drive / Arquivos para guardar o arquivo.\n\nSe não achar depois, procure no app "Arquivos" do celular:\nAndroid > data > com.joaokersting.taxidriver (ou com.driverflux.app) > files > DriverFlux');
         return true;
     } catch (cordovaErro) {
         console.warn('Falha no compartilhamento Cordova:', cordovaErro);
@@ -2484,7 +2513,7 @@ async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, tex
         document.body.appendChild(link);
         link.click();
         link.remove();
-        alert('✅ Arquivo gerado: ' + nomeArquivo + '\n\nSe não aparecer o seletor, procure em Downloads/Arquivos recentes.');
+        alert('✅ Arquivo gerado: ' + nomeArquivo + '\n\nSe não aparecer o seletor, procure no app "Arquivos" do celular em:\nAndroid/data/com.joaokersting.taxidriver/files/DriverFlux ou em Downloads recentes.');
         return true;
     } catch (dataErro) {
         console.warn('Falha no data URL:', dataErro);
@@ -2492,7 +2521,7 @@ async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, tex
 
     // 4) Último recurso: copia o texto.
     if (textoFallback) await copiarTextoDriverFlux(textoFallback, 'Não consegui salvar arquivo, mas copiei o conteúdo em texto.');
-    alert('❌ Não consegui abrir o salvamento neste aparelho. Conteúdo copiado como texto quando possível.');
+    alert('❌ Não consegui salvar o arquivo automaticamente.\n\nDica: O arquivo foi gerado na memória. Use o botão "Copiar" se apareceu, ou tente novamente depois de reiniciar o app.\n\nAlternativa: Use o botão "Imprimir/PDF" no relatório — ele abre a impressão do Android onde você pode escolher "Salvar como PDF".');
     return false;
 }
 
@@ -2502,7 +2531,7 @@ async function salvarRelatorioComoArquivo() {
     if (!texto) return alert('Gere o relatório antes de salvar em PDF.');
     const nome = 'driver-flux-relatorio-' + timestampArquivoDriverFlux() + '.pdf';
     const pdf = criarPDFTextoDriverFlux('Driver Flux - Relatorio', texto);
-    alert('📄 PDF do relatório criado. Agora vou abrir o compartilhamento para você escolher onde salvar.');
+    alert('📄 PDF do relatório criado com nome driver-flux-relatorio-....pdf\nVou abrir a caixa de seleção do Android agora. Escolha onde salvar (Drive, Arquivos, etc).');
     await salvarOuCompartilharBlobDriverFlux(pdf, nome, 'Relatório Driver Flux', texto);
 }
 
@@ -2512,7 +2541,7 @@ async function salvarRelatorioDespesasPDF() {
     if (!texto) return alert('Gere o relatório de despesas antes de salvar em PDF.');
     const nome = 'driver-flux-relatorio-despesas-' + timestampArquivoDriverFlux() + '.pdf';
     const pdf = criarPDFTextoDriverFlux('Driver Flux - Relatorio de Despesas', texto);
-    alert('📄 PDF de despesas criado. Agora vou abrir o compartilhamento para você escolher onde salvar.');
+    alert('📄 PDF de despesas criado com nome driver-flux-relatorio-despesas-....pdf\nVou abrir a caixa de seleção do Android agora. Escolha onde salvar (Drive, Arquivos, etc).');
     await salvarOuCompartilharBlobDriverFlux(pdf, nome, 'Relatório de Despesas Driver Flux', texto);
 }
 
@@ -2567,7 +2596,10 @@ async function fazerBackupDriverFlux() {
         'Pagamentos carregados: ' + (pagamentos?.length || 0),
         'Despesas carregadas: ' + (despesasTurno?.length || 0),
         '',
-        'Agora escolha onde salvar/mandar: Drive, Arquivos, WhatsApp, Gmail, etc.'
+        'O Android vai abrir a caixa de seleção de apps/pastas agora.',
+        'Escolha Drive, "Salvar em Arquivos" ou outro destino.',
+        '',
+        'Se precisar achar manualmente depois: app "Arquivos" > Android > data > com.joaokersting.taxidriver > files > DriverFlux'
     ].join('\n');
     alert(resumo);
 
