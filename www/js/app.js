@@ -24,6 +24,7 @@ function iniciarFirebaseSeNecessario() {
 let turnosHistoricoMaster = {}; 
 let registros = [];             
 let pagamentos = [];            
+let despesasTurno = [];            
 let coordenadaAtual = "Não capturado"; 
 let filtroTexto = "";
 let usuarioLogado = "";         
@@ -446,7 +447,7 @@ function abrirTurnoOperacional() {
         localStorage.setItem('driverflux_demo_km', km);
         localStorage.setItem('driverflux_demo_prefixo', prefixo);
         localStorage.setItem('driverflux_demo_status', 'aberto');
-        metadadosTurno = { id: "DEMO-LOCAL", motorista: "teste_demo", status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: "demo", prefixoCarro: prefixo };
+        metadadosTurno = { id: "DEMO-LOCAL", motorista: "teste_demo", status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: "comissionado", tipoPagamentoMotorista: "comissionado", comissaoPercentual: 30, valorKmDono: 0, prefixoCarro: prefixo };
         verificarStatusTurnoMotorista();
         return;
     }
@@ -454,10 +455,12 @@ function abrirTurnoOperacional() {
     iniciarFirebaseSeNecessario();
     db.ref(`usuarios/${usuarioLogado}`).once('value').then((snapshot) => {
         const dadosUser = snapshot.val();
-        const tipoContrato = (dadosUser && dadosUser.tipo) ? dadosUser.tipo : "efetivo";
+        const tipoPagamento = (dadosUser && (dadosUser.tipoPagamentoMotorista || dadosUser.tipo)) ? (dadosUser.tipoPagamentoMotorista || dadosUser.tipo) : "comissionado";
+        const comissaoPercentual = numeroSeguro(dadosUser && (dadosUser.comissaoPercentual || dadosUser.comissao));
+        const valorKmDono = numeroSeguro(dadosUser && (dadosUser.valorKmDono || dadosUser.valorKm));
         const novoTurnoRef = db.ref(`turnos_operacionais/${usuarioLogado}`).push();
         idTurnoAtivo = novoTurnoRef.key;
-        metadadosTurno = { id: idTurnoAtivo, motorista: usuarioLogado, status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: tipoContrato, prefixoCarro: prefixo };
+        metadadosTurno = { id: idTurnoAtivo, motorista: usuarioLogado, status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: tipoPagamento, tipoPagamentoMotorista: tipoPagamento, comissaoPercentual: comissaoPercentual, valorKmDono: valorKmDono, prefixoCarro: prefixo };
         novoTurnoRef.set(metadadosTurno).then(() => verificarStatusTurnoMotorista());
     });
 }
@@ -728,6 +731,55 @@ function realizarLogin() {
     });
 }
 
+
+function abrirModalDespesaTurno() {
+    const modal = document.getElementById('modalDespesaTurno');
+    if (!modal) return alert('Modal de despesa não encontrado.');
+    document.getElementById('inputDespesaTipo').value = 'gasolina';
+    document.getElementById('inputDespesaValor').value = '';
+    document.getElementById('inputDespesaDescricao').value = '';
+    modal.style.display = 'flex';
+    setTimeout(() => document.getElementById('inputDespesaValor')?.focus(), 80);
+}
+
+function fecharModalDespesaTurno() {
+    const modal = document.getElementById('modalDespesaTurno');
+    if (modal) modal.style.display = 'none';
+}
+
+function salvarDespesaTurno() {
+    if (!idTurnoAtivo) return alert('Abra um turno antes de lançar despesas.');
+    if (bloquearMasterForaDoProprioTurno('lançar despesa')) return;
+    const tipo = (document.getElementById('inputDespesaTipo')?.value || 'outros').trim();
+    const valor = numeroSeguro(document.getElementById('inputDespesaValor')?.value || 0);
+    const descricao = (document.getElementById('inputDespesaDescricao')?.value || '').trim();
+    if (valor <= 0) return alert('Informe o valor da despesa.');
+    const agora = new Date();
+    const despesa = {
+        tipo,
+        valor,
+        descricao,
+        motorista: motoristaDoTurnoAtual(),
+        prefixo: metadadosTurno.prefixoCarro || '',
+        dataHora: agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}),
+        criadoEm: agora.toISOString()
+    };
+
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        despesasTurno.push(despesa);
+        localStorage.setItem('driverflux_demo_despesas', JSON.stringify(despesasTurno));
+        fecharModalDespesaTurno();
+        alert('✅ Despesa lançada no turno.');
+        return;
+    }
+
+    iniciarFirebaseSeNecessario();
+    db.ref(`despesas_por_turno/${idTurnoAtivo}`).push(despesa).then(() => {
+        fecharModalDespesaTurno();
+        alert('✅ Despesa lançada no turno.');
+    }).catch(err => alert('Erro ao salvar despesa: ' + err.message));
+}
+
 function efetuarLogout() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         if (confirm("🚪 Sair do modo demonstração?")) {
@@ -755,18 +807,83 @@ function calcularTotais() {
 
     let tNormais = 0, tCreditoCorridas = 0, tBrutoEmprestado = 0;
     registros.forEach(r => { 
-        if (r.tipo === 'credito') { tCreditoCorridas += r.corrida; tBrutoEmprestado += r.emprestado; } else { tNormais += r.corrida; } 
+        if (r.tipo === 'credito') { tCreditoCorridas += numeroSeguro(r.corrida); tBrutoEmprestado += numeroSeguro(r.emprestado); } 
+        else { tNormais += numeroSeguro(r.corrida); } 
     });
     let juros = tBrutoEmprestado * 0.20;
+    const totalCreditoComJuros = tCreditoCorridas + tBrutoEmprestado + juros;
+    const producaoTotal = tNormais + totalCreditoComJuros;
     let fundoFixo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
-    
+    const despesas = totaisDespesasTurno();
+    const regime = obterRegimeMotoristaAtual();
+
     document.getElementById('totTrocoInicial').innerText = formatarMoeda(fundoFixo);
     document.getElementById('totNormais').innerText = formatarMoeda(tNormais);
     document.getElementById('totCorridasCredito').innerText = formatarMoeda(tCreditoCorridas);
     document.getElementById('totBruto').innerText = formatarMoeda(tBrutoEmprestado);
     document.getElementById('totAcrescimo').innerText = `+ ${formatarMoeda(juros)}`;
     document.getElementById('totGeral').innerText = formatarMoeda(fundoFixo + tNormais);
+
+    const elGas = document.getElementById('totDespesaGasolina');
+    const elMan = document.getElementById('totDespesaManutencao');
+    const elOut = document.getElementById('totDespesaOutros');
+    const elDesp = document.getElementById('totDespesas');
+    if (elGas) elGas.innerText = formatarMoeda(despesas.gasolina);
+    if (elMan) elMan.innerText = formatarMoeda(despesas.manutencao);
+    if (elOut) elOut.innerText = formatarMoeda(despesas.outros);
+    if (elDesp) elDesp.innerText = formatarMoeda(despesas.total);
+
+    const labelRegime = document.getElementById('labelRegimeMotorista');
+    const inputKmFinal = document.getElementById('inputKmFinalFechamento');
+    const boxKm = document.getElementById('boxKmFechamento');
+    if (labelRegime) {
+        labelRegime.innerText = regime.tipo === 'quilometragem'
+            ? `Quilometragem — ${formatarMoeda(regime.valorKmDono)} por KM para o dono`
+            : `Comissionado — ${regime.comissaoPercentual}% para o motorista`;
+    }
+    if (boxKm) boxKm.style.display = regime.tipo === 'quilometragem' ? 'block' : 'none';
+    if (inputKmFinal && !inputKmFinal.value && regime.kmFinal > 0) inputKmFinal.value = regime.kmFinal;
+    calcularAcertoMotoristaFechamento();
+
     document.getElementById('cardTotais').style.display = 'block';
+}
+
+function calcularAcertoMotoristaFechamento() {
+    let tNormais = 0, tCreditoCorridas = 0, tBrutoEmprestado = 0;
+    registros.forEach(r => { 
+        if (r.tipo === 'credito') { tCreditoCorridas += numeroSeguro(r.corrida); tBrutoEmprestado += numeroSeguro(r.emprestado); } 
+        else { tNormais += numeroSeguro(r.corrida); } 
+    });
+    const juros = tBrutoEmprestado * 0.20;
+    const producaoTotal = tNormais + tCreditoCorridas + tBrutoEmprestado + juros;
+    const despesas = totaisDespesasTurno();
+    const regime = obterRegimeMotoristaAtual();
+    const inputKmFinal = document.getElementById('inputKmFinalFechamento');
+    const kmFinal = numeroSeguro(inputKmFinal?.value || regime.kmFinal || 0);
+    const kmRodado = Math.max(kmFinal - regime.kmInicial, 0);
+
+    let textoPrincipal = '';
+    let valorMotorista = 0;
+    let valorDono = 0;
+
+    if (regime.tipo === 'quilometragem') {
+        valorDono = kmRodado * regime.valorKmDono;
+        valorMotorista = producaoTotal - despesas.total - valorDono;
+        textoPrincipal = `KM rodado: ${kmRodado.toLocaleString('pt-BR')} km × ${formatarMoeda(regime.valorKmDono)} = ${formatarMoeda(valorDono)} para o dono`;
+    } else {
+        valorMotorista = producaoTotal * (regime.comissaoPercentual / 100);
+        valorDono = producaoTotal - valorMotorista - despesas.total;
+        textoPrincipal = `Comissão do motorista: ${regime.comissaoPercentual}% sobre ${formatarMoeda(producaoTotal)} = ${formatarMoeda(valorMotorista)}`;
+    }
+
+    const elResumo = document.getElementById('totResumoAcerto');
+    const elMotorista = document.getElementById('totValorMotorista');
+    const elDono = document.getElementById('totValorDono');
+    const elLiquido = document.getElementById('totLiquidoAposDespesas');
+    if (elResumo) elResumo.innerText = textoPrincipal;
+    if (elMotorista) elMotorista.innerText = formatarMoeda(valorMotorista);
+    if (elDono) elDono.innerText = formatarMoeda(valorDono);
+    if (elLiquido) elLiquido.innerText = formatarMoeda(producaoTotal - despesas.total);
 }
 
 function formatarMoeda(valor) { return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -775,6 +892,8 @@ function inicializarMotorista() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         const salvo = localStorage.getItem('driverflux_demo_reg');
         registros = salvo ? JSON.parse(salvo) : [];
+        const despSalvas = localStorage.getItem('driverflux_demo_despesas');
+        despesasTurno = despSalvas ? JSON.parse(despSalvas) : [];
         renderizarTabela();
         renderToggleAcoesDemo(); 
         return;
@@ -788,6 +907,14 @@ function inicializarMotorista() {
             registros.push(item);
         });
         renderizarTabela();
+    });
+    db.ref(`despesas_por_turno/${idTurnoAtivo}`).on('value', (snapshot) => {
+        despesasTurno = [];
+        snapshot.forEach(child => {
+            const item = child.val() || {};
+            item.fbKey = child.key;
+            despesasTurno.push(item);
+        });
     });
 }
 
@@ -828,11 +955,16 @@ function cadastrarNovoMotoristaMaster() {
     const campoSenha = document.getElementById('novoMotoristaSenha');
     const campoTipo = document.getElementById('novoMotoristaTipo');
     const campoPrefixo = document.getElementById('novoMotoristaPrefixo');
+    const campoComissao = document.getElementById('novoMotoristaComissao');
+    const campoValorKm = document.getElementById('novoMotoristaValorKm');
 
     if (campoUser) campoUser.value = '';
     if (campoSenha) campoSenha.value = '';
-    if (campoTipo) campoTipo.value = 'efetivo';
+    if (campoTipo) campoTipo.value = 'comissionado';
     if (campoPrefixo) campoPrefixo.value = '';
+    if (campoComissao) campoComissao.value = '30';
+    if (campoValorKm) campoValorKm.value = '';
+    atualizarCamposTipoPagamentoMotorista();
 
     modal.style.display = 'flex';
     setTimeout(() => { if (campoUser) campoUser.focus(); }, 80);
@@ -843,17 +975,29 @@ function fecharModalCadastroMotorista() {
     if (modal) modal.style.display = 'none';
 }
 
+function atualizarCamposTipoPagamentoMotorista() {
+    const tipo = (document.getElementById('novoMotoristaTipo')?.value || 'comissionado').toLowerCase();
+    const boxComissao = document.getElementById('boxComissaoMotorista');
+    const boxValorKm = document.getElementById('boxValorKmMotorista');
+    if (boxComissao) boxComissao.style.display = tipo === 'comissionado' ? 'block' : 'none';
+    if (boxValorKm) boxValorKm.style.display = tipo === 'quilometragem' ? 'block' : 'none';
+}
+
 function salvarNovoMotoristaMaster() {
     const userRaw = (document.getElementById('novoMotoristaUsuario')?.value || '').trim();
     const pass = (document.getElementById('novoMotoristaSenha')?.value || '').trim();
-    const tipo = (document.getElementById('novoMotoristaTipo')?.value || 'efetivo').trim().toLowerCase();
+    const tipo = (document.getElementById('novoMotoristaTipo')?.value || 'comissionado').trim().toLowerCase();
     const prefixo = (document.getElementById('novoMotoristaPrefixo')?.value || '').trim();
+    const comissaoPercentual = numeroSeguro(document.getElementById('novoMotoristaComissao')?.value || 0);
+    const valorKmDono = numeroSeguro(document.getElementById('novoMotoristaValorKm')?.value || 0);
 
     if (!userRaw) return alert('⚠️ Informe o nome de usuário do motorista.');
     if (!pass) return alert('⚠️ Informe uma senha para o motorista.');
+    if (tipo === 'comissionado' && comissaoPercentual <= 0) return alert('⚠️ Informe a porcentagem da comissão do motorista.');
+    if (tipo === 'quilometragem' && valorKmDono <= 0) return alert('⚠️ Informe o valor por KM que o motorista paga ao dono do carro.');
 
     const user = userRaw.toLowerCase().replace(/\s+/g, '_');
-    const payload = { senha: pass, tipo: tipo };
+    const payload = { senha: pass, tipo: tipo, tipoPagamentoMotorista: tipo, comissaoPercentual: comissaoPercentual, valorKmDono: valorKmDono };
     if (prefixo) payload.prefixoCarro = prefixo.toUpperCase();
 
     iniciarFirebaseSeNecessario();
@@ -1053,8 +1197,34 @@ function descricaoPeriodoRelatorio(periodo) {
 }
 
 function numeroSeguro(valor) {
+    if (typeof valor === 'string') valor = valor.replace(',', '.');
     const n = parseFloat(valor);
     return isNaN(n) ? 0 : n;
+}
+
+function obterRegimeMotoristaAtual() {
+    const tipo = (metadadosTurno.tipoPagamentoMotorista || metadadosTurno.tipoContrato || metadadosTurno.tipo || 'comissionado').toString().toLowerCase();
+    const ehKm = ['quilometragem', 'km', 'por_km', 'aluguel_km'].includes(tipo);
+    return {
+        tipo: ehKm ? 'quilometragem' : 'comissionado',
+        comissaoPercentual: numeroSeguro(metadadosTurno.comissaoPercentual || metadadosTurno.comissao || 0),
+        valorKmDono: numeroSeguro(metadadosTurno.valorKmDono || metadadosTurno.valorKm || 0),
+        kmInicial: numeroSeguro(metadadosTurno.kmInicial || localStorage.getItem('driverflux_demo_km') || 0),
+        kmFinal: numeroSeguro(metadadosTurno.kmFinal || 0)
+    };
+}
+
+function totaisDespesasTurno() {
+    const totais = { gasolina: 0, manutencao: 0, outros: 0, total: 0 };
+    (despesasTurno || []).forEach(d => {
+        const tipo = (d.tipo || 'outros').toString().toLowerCase();
+        const valor = numeroSeguro(d.valor);
+        if (tipo.includes('gas')) totais.gasolina += valor;
+        else if (tipo.includes('manut')) totais.manutencao += valor;
+        else totais.outros += valor;
+        totais.total += valor;
+    });
+    return totais;
 }
 
 function escaparHtmlRelatorio(valor) {
@@ -1146,7 +1316,7 @@ function gerarRelatorio() {
     const prefixoAtivo = (metadadosTurno.prefixoCarro || localStorage.getItem('driverflux_demo_prefixo') || 'N/I').toString().toUpperCase();
     const fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
 
-    registros.forEach(r => {
+    registrosRelatorio.forEach(r => {
         const corrida = numeroSeguro(r.corrida);
         const emprestado = numeroSeguro(r.emprestado);
         const juros = emprestado * 0.20;
@@ -1171,6 +1341,14 @@ function gerarRelatorio() {
     const saldoPendente = Math.max(totalCreditoComJuros - totalPago, 0);
     const producaoTotal = tNormais + totalCreditoComJuros;
     const dinheiroEsperado = fundo + tNormais + totalPago;
+    const despesas = totaisDespesasTurno();
+    const regime = obterRegimeMotoristaAtual();
+    const kmFinalRel = numeroSeguro(metadadosTurno.kmFinal || document.getElementById('inputKmFinalFechamento')?.value || 0);
+    const kmRodadoRel = Math.max(kmFinalRel - regime.kmInicial, 0);
+    const comissaoMotoristaRel = regime.tipo === 'comissionado' ? producaoTotal * (regime.comissaoPercentual / 100) : 0;
+    const aluguelKmRel = regime.tipo === 'quilometragem' ? kmRodadoRel * regime.valorKmDono : 0;
+    const liquidoDonoRel = regime.tipo === 'comissionado' ? producaoTotal - comissaoMotoristaRel - despesas.total : aluguelKmRel;
+    const sobraMotoristaRel = regime.tipo === 'quilometragem' ? producaoTotal - despesas.total - aluguelKmRel : comissaoMotoristaRel;
     const dataGeracao = new Date().toLocaleString('pt-BR');
     const periodoTexto = descricaoPeriodoRelatorio(periodo);
 
@@ -1203,6 +1381,21 @@ function gerarRelatorio() {
                 <div class="report-list-row"><strong>Corridas no crédito</strong><span>${formatarMoeda(tCreditoCorridas)}</span></div>
                 <div class="report-list-row"><strong>Empréstimos</strong><span>${formatarMoeda(tEmprestado)}</span></div>
                 <div class="report-list-row"><strong>Taxa/juros 20%</strong><span>${formatarMoeda(tJuros)}</span></div>
+            </div>
+
+            <div class="report-section">
+                <h4>Despesas do Turno <span>${formatarMoeda(despesas.total)}</span></h4>
+                <div class="report-list-row"><strong>Gasolina</strong><span>${formatarMoeda(despesas.gasolina)}</span></div>
+                <div class="report-list-row"><strong>Manutenção</strong><span>${formatarMoeda(despesas.manutencao)}</span></div>
+                <div class="report-list-row"><strong>Outras despesas</strong><span>${formatarMoeda(despesas.outros)}</span></div>
+            </div>
+
+            <div class="report-section">
+                <h4>Acerto Motorista / Dono</h4>
+                <div class="report-list-row"><strong>Regime</strong><span>${regime.tipo === 'quilometragem' ? 'Por KM' : 'Comissão'}</span></div>
+                ${regime.tipo === 'quilometragem' ? `<div class="report-list-row"><strong>KM inicial / final / rodado</strong><span>${regime.kmInicial} / ${kmFinalRel || '-'} / ${kmRodadoRel}</span></div><div class="report-list-row"><strong>Valor ao dono por KM</strong><span>${formatarMoeda(aluguelKmRel)}</span></div>` : `<div class="report-list-row"><strong>Comissão do motorista</strong><span>${regime.comissaoPercentual}% = ${formatarMoeda(comissaoMotoristaRel)}</span></div>`}
+                <div class="report-list-row"><strong>Motorista fica/recebe</strong><span>${formatarMoeda(sobraMotoristaRel)}</span></div>
+                <div class="report-list-row"><strong>Dono do carro</strong><span>${formatarMoeda(liquidoDonoRel)}</span></div>
             </div>
 
             <div class="report-section">
@@ -1374,18 +1567,28 @@ function fecharRelatorioProfissional() {
 function encerrarTurnoDefinitivo() {
     const btn = document.getElementById('btnFecharTurnoOficial');
     if (btn && btn.disabled) return;
+
+    const regime = obterRegimeMotoristaAtual();
+    const inputKmFinal = document.getElementById('inputKmFinalFechamento');
+    const kmFinal = numeroSeguro(inputKmFinal?.value || 0);
+    if (regime.tipo === 'quilometragem') {
+        if (kmFinal <= 0) return alert('Informe o hodômetro final para calcular o acerto por quilometragem.');
+        if (kmFinal < regime.kmInicial) return alert('O hodômetro final não pode ser menor que o hodômetro inicial.');
+    }
+    calcularAcertoMotoristaFechamento();
     
     if (!confirm("Deseja realmente encerrar este turno?")) return;
     
     if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Encerrando..."; }
 
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        if (kmFinal > 0) localStorage.setItem('driverflux_demo_km_final', kmFinal);
         localStorage.setItem('driverflux_demo_status', 'fechado');
         location.reload(); return;
     }
     iniciarFirebaseSeNecessario();
     db.ref(`turnos_operacionais/${usuarioLogado}/${idTurnoAtivo}`).update({
-        status: 'fechado', fechamento: new Date().toLocaleString('pt-BR')
+        status: 'fechado', fechamento: new Date().toLocaleString('pt-BR'), kmFinal: kmFinal || null
     }).then(() => { alert("Turno encerrado com sucesso!"); location.reload(); }).catch(err => {
         alert("Erro ao encerrar turno: " + err.message);
         if (btn) { btn.disabled = false; btn.innerHTML = "🔴 Encerrar Turno e Fechar Caixa"; }
