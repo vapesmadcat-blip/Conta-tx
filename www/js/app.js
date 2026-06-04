@@ -2623,3 +2623,181 @@ function restaurarBackupDriverFlux(event) {
     };
     reader.readAsText(arq);
 }
+
+/* ============================================================
+   Driver Flux - PDF real com jsPDF + salvamento Cordova
+   Esta seção fica no fim do arquivo para sobrescrever rotinas antigas
+   de HTML imprimível / PDF manual.
+============================================================ */
+function dfTextoLimpoParaPdf(valor) {
+    return String(valor || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/[\t ]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+function dfCriarPdfBlobDriverFlux(titulo, texto) {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+        throw new Error('Biblioteca jsPDF não carregada. Verifique o index.html.');
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margem = 36;
+    const larguraTexto = pageW - margem * 2;
+    let y = 42;
+
+    function novaPaginaSePreciso(alturaLinha) {
+        if (y + alturaLinha > pageH - 38) {
+            doc.addPage();
+            y = 42;
+        }
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(String(titulo || 'Driver Flux'), margem, y);
+    y += 18;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), margem, y);
+    y += 20;
+
+    doc.setFontSize(10);
+    const linhas = doc.splitTextToSize(dfTextoLimpoParaPdf(texto || ''), larguraTexto);
+    linhas.forEach(linha => {
+        novaPaginaSePreciso(13);
+        doc.text(linha || ' ', margem, y);
+        y += 13;
+    });
+
+    return doc.output('blob');
+}
+
+function dfResolverPastaCordovaDriverFlux() {
+    return new Promise((resolve, reject) => {
+        if (!window.cordova || !window.resolveLocalFileSystemURL || !window.cordova.file) {
+            reject(new Error('cordova-plugin-file não está disponível neste APK.'));
+            return;
+        }
+        const candidatos = [
+            cordova.file.dataDirectory,
+            cordova.file.externalDataDirectory,
+            (cordova.file.externalRootDirectory || '') + 'Download/',
+            (cordova.file.externalRootDirectory || '') + 'Downloads/'
+        ].filter(Boolean);
+        let ultimoErro = null;
+        const tentar = (i) => {
+            if (i >= candidatos.length) return reject(ultimoErro || new Error('Nenhuma pasta Cordova disponível.'));
+            window.resolveLocalFileSystemURL(candidatos[i], dir => resolve({ dir, pasta: candidatos[i] }), err => {
+                ultimoErro = err;
+                tentar(i + 1);
+            });
+        };
+        tentar(0);
+    });
+}
+
+function salvarBlobEmDownloadsDriverFlux(blob, nomeArquivo) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const { dir, pasta } = await dfResolverPastaCordovaDriverFlux();
+            dir.getFile(nomeArquivo, { create: true, exclusive: false }, fileEntry => {
+                fileEntry.createWriter(writer => {
+                    writer.onwriteend = () => resolve({
+                        pasta,
+                        nomeArquivo,
+                        nativeURL: fileEntry.nativeURL || fileEntry.toURL(),
+                        cdvURL: fileEntry.toURL(),
+                        caminhoVisivel: pasta.indexOf('/Download') >= 0 ? 'Downloads/' + nomeArquivo : 'área interna do Driver Flux/' + nomeArquivo
+                    });
+                    writer.onerror = err => reject(err || new Error('Erro ao escrever arquivo.'));
+                    writer.write(blob);
+                }, reject);
+            }, reject);
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+async function salvarArquivoDriverFlux(blob, nomeArquivo, titulo, textoFallback) {
+    let info = null;
+    try {
+        info = await salvarBlobEmDownloadsDriverFlux(blob, nomeArquivo);
+    } catch (e) {
+        console.warn('Falha ao salvar via Cordova File:', e);
+    }
+
+    if (info && window.plugins && window.plugins.socialsharing) {
+        try {
+            await new Promise((resolve, reject) => {
+                window.plugins.socialsharing.shareWithOptions({
+                    subject: titulo || 'Driver Flux',
+                    message: titulo || 'Arquivo Driver Flux',
+                    files: [info.nativeURL || info.cdvURL]
+                }, resolve, reject);
+            });
+            alert('✅ Arquivo criado e enviado para o compartilhamento do Android.\n\n' + nomeArquivo);
+            return true;
+        } catch (e) {
+            console.warn('Arquivo salvo, mas compartilhamento falhou:', e);
+            alert('✅ Arquivo salvo.\n\n' + nomeArquivo + '\n\nLocal: ' + info.caminhoVisivel);
+            return true;
+        }
+    }
+
+    if (info) {
+        alert('✅ Arquivo salvo.\n\n' + nomeArquivo + '\n\nLocal: ' + info.caminhoVisivel);
+        return true;
+    }
+
+    try {
+        salvarBlobNavegadorDriverFlux(blob, nomeArquivo);
+        alert('✅ Arquivo gerado: ' + nomeArquivo + '\n\nSe estiver no navegador, procure em Downloads.');
+        return true;
+    } catch (e) {
+        console.warn('Fallback navegador falhou:', e);
+    }
+
+    if (textoFallback) await copiarTextoDriverFlux(textoFallback, 'Não consegui salvar, mas copiei o conteúdo para a área de transferência.');
+    alert('❌ Não consegui salvar este arquivo neste aparelho.');
+    return false;
+}
+
+async function salvarRelatorioComoArquivo() {
+    const output = document.getElementById('reportOutput');
+    const texto = dfTextoLimpoParaPdf(output?.innerText || '');
+    if (!texto) return alert('Gere o relatório antes de salvar.');
+
+    try {
+        const blob = dfCriarPdfBlobDriverFlux('Relatório Driver Flux', texto);
+        const nome = 'DriverFlux_Relatorio_' + timestampArquivoDriverFlux() + '.pdf';
+        await salvarArquivoDriverFlux(blob, nome, 'Relatório Driver Flux', texto);
+    } catch (e) {
+        alert('❌ Erro ao gerar PDF: ' + (e.message || e));
+    }
+}
+
+async function salvarRelatorioDespesasPDF() {
+    const output = document.getElementById('reportDespesasOutput');
+    const texto = dfTextoLimpoParaPdf(output?.innerText || '');
+    if (!texto) return alert('Gere o relatório de despesas antes de salvar.');
+
+    try {
+        const blob = dfCriarPdfBlobDriverFlux('Relatório de Despesas - Driver Flux', texto);
+        const nome = 'DriverFlux_Relatorio_Despesas_' + timestampArquivoDriverFlux() + '.pdf';
+        await salvarArquivoDriverFlux(blob, nome, 'Relatório de Despesas Driver Flux', texto);
+    } catch (e) {
+        alert('❌ Erro ao gerar PDF de despesas: ' + (e.message || e));
+    }
+}
+
+async function imprimirRelatorioPDF() {
+    // No Android WebView, window.print costuma falhar. Aqui geramos PDF real.
+    await salvarRelatorioComoArquivo();
+}
