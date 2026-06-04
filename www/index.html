@@ -106,6 +106,7 @@
         .driver-help { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:12px; padding:10px 12px; font-size:12px; font-weight:700; line-height:1.35; margin-top:4px; }
         .driver-actions { display:flex; gap:10px; margin-top:18px; }
         .driver-actions button { min-height:46px; }
+        .finance-note { background:#eef2ff; border:1px solid #c7d2fe; color:#3730a3; border-radius:12px; padding:10px 12px; font-size:12px; font-weight:800; line-height:1.35; margin-bottom:10px; }
         .btn-secondary-clean { background:#e2e8f0; color:#334155; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
@@ -226,6 +227,7 @@
 
         <div class="btn-grid-actions">
             <button class="btn-incluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
+            <button class="btn-relatorio" style="background:#f59e0b; color:white;" onclick="abrirModalDespesaTurno()">⛽ Despesa</button>
             <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
             <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
             <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
@@ -281,6 +283,27 @@
             <div class="result-row"><span>Dinheiro Emprestado:</span> <span id="totBruto">R$ 0,00</span></div>
             <div class="result-row"><span>Taxa do Ponto (+20%):</span> <span id="totAcrescimo" class="danger-text">+ R$ 0,00</span></div>
             <div class="result-row total-final"><span>Dinheiro Vivo Esperado:</span> <span id="totGeral">R$ 0,00</span></div>
+
+            <div style="margin-top:16px; padding-top:14px; border-top:1px dashed #cbd5e1;">
+                <h2 style="margin-bottom:10px;">Despesas do Turno</h2>
+                <div class="result-row"><span>Gasolina:</span> <span id="totDespesaGasolina" class="danger-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Manutenção:</span> <span id="totDespesaManutencao" class="danger-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Outras despesas:</span> <span id="totDespesaOutros" class="danger-text">R$ 0,00</span></div>
+                <div class="result-row total-final"><span>Total de Despesas:</span> <span id="totDespesas">R$ 0,00</span></div>
+            </div>
+
+            <div style="margin-top:16px; padding-top:14px; border-top:1px dashed #cbd5e1;">
+                <h2 style="margin-bottom:10px;">Acerto Motorista / Dono</h2>
+                <div class="finance-note" id="labelRegimeMotorista">Regime não informado</div>
+                <div class="input-group" id="boxKmFechamento" style="display:none;">
+                    <label>🚗 Hodômetro Final</label>
+                    <input type="number" id="inputKmFinalFechamento" placeholder="KM no encerramento" oninput="calcularAcertoMotoristaFechamento()">
+                </div>
+                <div class="result-row"><span>Resumo do acerto:</span> <span id="totResumoAcerto" style="text-align:right; max-width:60%; font-weight:800;">-</span></div>
+                <div class="result-row"><span>Motorista fica/recebe:</span> <span id="totValorMotorista" class="success-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Dono do carro:</span> <span id="totValorDono" class="success-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Líquido após despesas:</span> <span id="totLiquidoAposDespesas">R$ 0,00</span></div>
+            </div>
             
             <!-- BOTÕES DE FECHAMENTO (COM CANCELAR) -->
             <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -394,10 +417,20 @@
 
             <div class="driver-mini-card input-group">
                 <label for="novoMotoristaTipo">Tipo de contrato</label>
-                <select id="novoMotoristaTipo">
-                    <option value="efetivo">Efetivo</option>
+                <select id="novoMotoristaTipo" onchange="atualizarCamposTipoPagamentoMotorista()">
                     <option value="comissionado">Comissionado</option>
+                    <option value="quilometragem">Paga por quilometragem ao dono</option>
                 </select>
+            </div>
+
+            <div class="driver-mini-card input-group" id="boxComissaoMotorista">
+                <label for="novoMotoristaComissao">Comissão do motorista (%)</label>
+                <input type="number" step="0.01" id="novoMotoristaComissao" placeholder="Ex: 30">
+            </div>
+
+            <div class="driver-mini-card input-group" id="boxValorKmMotorista" style="display:none;">
+                <label for="novoMotoristaValorKm">Valor por KM pago ao dono do carro (R$)</label>
+                <input type="number" step="0.01" id="novoMotoristaValorKm" placeholder="Ex: 1.20">
             </div>
 
             <div class="driver-mini-card input-group">
@@ -407,12 +440,46 @@
         </div>
 
         <div class="driver-help">
-            Dica: use um usuário curto e fácil de digitar no celular. Exemplo: pedro, maria, carro07.
+            Dica: em comissionado, o fechamento calcula quanto o motorista recebe. Por quilometragem, o fechamento usa hodômetro inicial/final para calcular quanto o motorista paga ao dono do carro.
         </div>
 
         <div class="driver-actions">
             <button class="btn-secondary-clean" style="flex:1;" onclick="fecharModalCadastroMotorista()">Cancelar</button>
             <button class="btn-incluir" style="flex:1.4;" onclick="salvarNovoMotoristaMaster()">✅ Salvar Motorista</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- MODAL DE DESPESA DO TURNO -->
+<div class="modal" id="modalDespesaTurno">
+    <div class="modal-content">
+        <div class="driver-form-head">
+            <div class="driver-avatar">⛽</div>
+            <div>
+                <h3 style="font-size:18px; margin:0;">Lançar Despesa do Turno</h3>
+                <div class="driver-subtitle">Use para gasolina, manutenção ou outra despesa feita durante o turno do carro.</div>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>Tipo de despesa</label>
+            <select id="inputDespesaTipo">
+                <option value="gasolina">Gasolina / combustível</option>
+                <option value="manutencao">Manutenção</option>
+                <option value="outros">Outros</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Valor (R$)</label>
+            <input type="number" step="0.01" id="inputDespesaValor" placeholder="0,00">
+        </div>
+        <div class="input-group">
+            <label>Descrição opcional</label>
+            <input type="text" id="inputDespesaDescricao" placeholder="Ex: posto, óleo, pneu, lavagem">
+        </div>
+        <div class="driver-actions">
+            <button class="btn-secondary-clean" style="flex:1;" onclick="fecharModalDespesaTurno()">Cancelar</button>
+            <button class="btn-incluir" style="flex:1.4;" onclick="salvarDespesaTurno()">✅ Salvar Despesa</button>
         </div>
     </div>
 </div>
