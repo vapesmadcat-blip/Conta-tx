@@ -5,8 +5,11 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Permissões para salvar arquivos (backups JSON e PDFs) em armazenamento visível -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
-    <application>
+    <application android:requestLegacyExternalStorage="true">
         <service android:name=".LocationService" android:foregroundServiceType="location" android:enabled="true" android:exported="false" />
     </application>
 </manifest>
