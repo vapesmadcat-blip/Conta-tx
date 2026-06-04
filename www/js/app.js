@@ -1730,48 +1730,7 @@ function abrirRelatorioEmNovaJanela(html) {
     }
 }
 
-async function salvarRelatorioComoArquivo() {
-    const html = montarHtmlRelatorioParaImpressao();
-    if (!html) {
-        alert('Gere o relatório antes de salvar ou compartilhar.');
-        return;
-    }
-
-    const agora = new Date();
-    const nomeArquivo = 'relatorio-driverflux-' + agora.toISOString().slice(0, 10) + '.html';
-    const textoResumo = (document.getElementById('reportOutput')?.innerText || 'Relatório DriverFlux').trim();
-    const arquivo = new File([html], nomeArquivo, { type: 'text/html' });
-
-    try {
-        if (navigator.canShare && navigator.canShare({ files: [arquivo] }) && navigator.share) {
-            await navigator.share({
-                title: 'Relatório DriverFlux',
-                text: 'Relatório de turno DriverFlux',
-                files: [arquivo]
-            });
-            alert('✅ Relatório enviado para o menu de compartilhamento do Android. Se você escolheu Drive, WhatsApp ou Arquivos, procure nele.');
-            return;
-        }
-    } catch (e) {
-        alert('⚠️ O compartilhamento foi cancelado ou bloqueado pelo Android. Vou tentar gerar um arquivo para download.');
-    }
-
-    try {
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = nomeArquivo;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
-        alert('✅ Relatório gerado como HTML. No Android, procure em Downloads/Arquivos recentes. Para PDF verdadeiro, use “Imprimir/PDF” e escolha “Salvar em PDF”.');
-    } catch (e) {
-        await copiarTextoDriverFlux(textoResumo, '✅ Não consegui salvar arquivo neste aparelho, mas copiei o relatório em texto para você colar/salvar.');
-        abrirRelatorioEmNovaJanela(html);
-    }
-}
+// REMOVIDO: versão antiga que salvava HTML. A versão atual (no final do arquivo) salva PDF real + fluxo de compartilhamento consistente com backup.
 
 function fecharRelatorioProfissional() {
     const card = document.getElementById('cardRelatorio');
@@ -2337,7 +2296,8 @@ document.addEventListener('click', function(e) {
 function timestampArquivoDriverFlux() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+    // Formato com traços para nome de arquivo limpo: 2026-06-04-03-28-05
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
 }
 
 function limparTextoPDFDriverFlux(texto) {
@@ -2540,7 +2500,7 @@ async function salvarRelatorioComoArquivo() {
     const output = document.getElementById('reportOutput');
     const texto = (output?.innerText || '').trim();
     if (!texto) return alert('Gere o relatório antes de salvar em PDF.');
-    const nome = 'DriverFlux_Relatorio_' + timestampArquivoDriverFlux() + '.pdf';
+    const nome = 'driver-flux-relatorio-' + timestampArquivoDriverFlux() + '.pdf';
     const pdf = criarPDFTextoDriverFlux('Driver Flux - Relatorio', texto);
     alert('📄 PDF do relatório criado. Agora vou abrir o compartilhamento para você escolher onde salvar.');
     await salvarOuCompartilharBlobDriverFlux(pdf, nome, 'Relatório Driver Flux', texto);
@@ -2550,7 +2510,7 @@ async function salvarRelatorioDespesasPDF() {
     const output = document.getElementById('reportDespesasOutput');
     const texto = (output?.innerText || '').trim();
     if (!texto) return alert('Gere o relatório de despesas antes de salvar em PDF.');
-    const nome = 'DriverFlux_Relatorio_Despesas_' + timestampArquivoDriverFlux() + '.pdf';
+    const nome = 'driver-flux-relatorio-despesas-' + timestampArquivoDriverFlux() + '.pdf';
     const pdf = criarPDFTextoDriverFlux('Driver Flux - Relatorio de Despesas', texto);
     alert('📄 PDF de despesas criado. Agora vou abrir o compartilhamento para você escolher onde salvar.');
     await salvarOuCompartilharBlobDriverFlux(pdf, nome, 'Relatório de Despesas Driver Flux', texto);
@@ -2595,7 +2555,7 @@ async function fazerBackupDriverFlux() {
         firebase: await coletarFirebaseBackupDriverFlux()
     };
     const json = JSON.stringify(backup, null, 2);
-    const nome = 'DriverFlux_Backup_' + timestampArquivoDriverFlux() + '.json';
+    const nome = 'driver-flux-backup-' + timestampArquivoDriverFlux() + '.json';
     const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
 
     const resumo = [
