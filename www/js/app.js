@@ -2331,3 +2331,225 @@ document.addEventListener('click', function(e) {
         fecharModalCadastroMotorista();
     }
 });
+
+// ==================== BACKUP / RESTAURAÇÃO + PDF NATIVO SIMPLES ====================
+
+function limparTextoPDFDriverFlux(texto) {
+    return (texto || '').toString()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+        .replace(/[–—]/g, '-')
+        .replace(/[•]/g, '-')
+        .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+        .replace(/[^\x09\x0A\x0D\x20-\x7EÀ-ÿ]/g, '');
+}
+
+function escaparPDFDriverFlux(texto) {
+    return limparTextoPDFDriverFlux(texto).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function quebrarLinhaPDFDriverFlux(linha, maxChars) {
+    linha = limparTextoPDFDriverFlux(linha).replace(/\s+/g, ' ').trim();
+    if (!linha) return [''];
+    const partes = [];
+    let atual = '';
+    linha.split(' ').forEach(palavra => {
+        if ((atual + ' ' + palavra).trim().length > maxChars) {
+            if (atual) partes.push(atual);
+            atual = palavra;
+        } else {
+            atual = (atual + ' ' + palavra).trim();
+        }
+    });
+    if (atual) partes.push(atual);
+    return partes;
+}
+
+function criarPDFTextoDriverFlux(titulo, texto) {
+    const largura = 595.28;
+    const altura = 841.89;
+    const margem = 42;
+    const fonte = 10;
+    const entrelinha = 14;
+    const maxLinhas = Math.floor((altura - margem * 2 - 30) / entrelinha);
+    const linhasOriginais = limparTextoPDFDriverFlux(texto || '').split(/\r?\n/);
+    const linhas = [];
+    linhas.push(titulo || 'DriverFlux');
+    linhas.push('Gerado em: ' + new Date().toLocaleString('pt-BR'));
+    linhas.push('');
+    linhasOriginais.forEach(l => quebrarLinhaPDFDriverFlux(l, 86).forEach(q => linhas.push(q)));
+
+    const paginas = [];
+    for (let i = 0; i < linhas.length; i += maxLinhas) paginas.push(linhas.slice(i, i + maxLinhas));
+
+    const objetos = [];
+    function addObj(conteudo) { objetos.push(conteudo); return objetos.length; }
+
+    const fontObj = addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    const pageKids = [];
+
+    paginas.forEach((pag, idx) => {
+        let y = altura - margem;
+        let stream = 'BT\n/F1 ' + fonte + ' Tf\n';
+        pag.forEach((linha, lineIdx) => {
+            const size = (idx === 0 && lineIdx === 0) ? 15 : fonte;
+            stream += `/F1 ${size} Tf\n${margem} ${y.toFixed(2)} Td (${escaparPDFDriverFlux(linha)}) Tj\n-${margem} 0 Td\n`;
+            y -= (lineIdx === 0 && idx === 0) ? 20 : entrelinha;
+        });
+        stream += 'ET';
+        const contentObj = addObj('<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream');
+        const pageObj = addObj('<< /Type /Page /Parent 0 0 R /MediaBox [0 0 ' + largura + ' ' + altura + '] /Resources << /Font << /F1 ' + fontObj + ' 0 R >> >> /Contents ' + contentObj + ' 0 R >>');
+        pageKids.push(pageObj);
+    });
+
+    const pagesObjIndex = objetos.length + 1;
+    pageKids.forEach(pageObjNum => {
+        objetos[pageObjNum - 1] = objetos[pageObjNum - 1].replace('/Parent 0 0 R', '/Parent ' + pagesObjIndex + ' 0 R');
+    });
+    const pagesObj = addObj('<< /Type /Pages /Kids [' + pageKids.map(n => n + ' 0 R').join(' ') + '] /Count ' + pageKids.length + ' >>');
+    const catalogObj = addObj('<< /Type /Catalog /Pages ' + pagesObj + ' 0 R >>');
+
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+    objetos.forEach((obj, i) => {
+        offsets.push(pdf.length);
+        pdf += (i + 1) + ' 0 obj\n' + obj + '\nendobj\n';
+    });
+    const xref = pdf.length;
+    pdf += 'xref\n0 ' + (objetos.length + 1) + '\n0000000000 65535 f \n';
+    for (let i = 1; i <= objetos.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    pdf += 'trailer\n<< /Size ' + (objetos.length + 1) + ' /Root ' + catalogObj + ' 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+    return new Blob([pdf], { type: 'application/pdf' });
+}
+
+async function salvarOuCompartilharBlobDriverFlux(blob, nomeArquivo, titulo, textoFallback) {
+    const arquivo = new File([blob], nomeArquivo, { type: blob.type || 'application/octet-stream' });
+    try {
+        if (navigator.canShare && navigator.canShare({ files: [arquivo] }) && navigator.share) {
+            await navigator.share({ title: titulo || nomeArquivo, text: titulo || nomeArquivo, files: [arquivo] });
+            alert('✅ Arquivo enviado para o compartilhamento do Android. Escolha Drive, WhatsApp, Arquivos ou outro destino.');
+            return true;
+        }
+    } catch (e) {
+        alert('⚠️ Compartilhamento cancelado ou bloqueado. Vou tentar salvar como download.');
+    }
+
+    try {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nomeArquivo;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        alert('✅ Arquivo gerado. Procure em Downloads, Arquivos recentes ou na pasta escolhida pelo Android.');
+        return true;
+    } catch (e) {
+        if (textoFallback) await copiarTextoDriverFlux(textoFallback, 'Não consegui salvar arquivo, mas copiei o conteúdo em texto.');
+        return false;
+    }
+}
+
+async function salvarRelatorioComoArquivo() {
+    const output = document.getElementById('reportOutput');
+    const texto = (output?.innerText || '').trim();
+    if (!texto) return alert('Gere o relatório antes de salvar em PDF.');
+    const nome = 'relatorio-driverflux-' + new Date().toISOString().slice(0, 10) + '.pdf';
+    const pdf = criarPDFTextoDriverFlux('DriverFlux - Relatorio', texto);
+    await salvarOuCompartilharBlobDriverFlux(pdf, nome, 'Relatório DriverFlux', texto);
+}
+
+async function salvarRelatorioDespesasPDF() {
+    const output = document.getElementById('reportDespesasOutput');
+    const texto = (output?.innerText || '').trim();
+    if (!texto) return alert('Gere o relatório de despesas antes de salvar em PDF.');
+    const nome = 'despesas-driverflux-' + new Date().toISOString().slice(0, 10) + '.pdf';
+    const pdf = criarPDFTextoDriverFlux('DriverFlux - Relatorio de Despesas', texto);
+    await salvarOuCompartilharBlobDriverFlux(pdf, nome, 'Relatório de Despesas DriverFlux', texto);
+}
+
+function montarLocalStorageBackupDriverFlux() {
+    const dados = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const chave = localStorage.key(i);
+        if (chave && chave.startsWith('driverflux_')) dados[chave] = localStorage.getItem(chave);
+    }
+    return dados;
+}
+
+async function coletarFirebaseBackupDriverFlux() {
+    if (localStorage.getItem('driverflux_modo_demo') === 'true' || !db) return null;
+    iniciarFirebaseSeNecessario();
+    const paths = ['usuarios', 'turnos_operacionais', 'corridas_por_turno', 'pagamentos', 'despesas_por_turno'];
+    const out = {};
+    for (const path of paths) {
+        try {
+            const snap = await db.ref(path).once('value');
+            out[path] = snap.val() || null;
+        } catch (e) {
+            out[path] = { erro: e.message || String(e) };
+        }
+    }
+    return out;
+}
+
+async function fazerBackupDriverFlux() {
+    const btns = Array.from(document.querySelectorAll('button'));
+    const backup = {
+        app: 'DriverFlux / Conta-TX',
+        versaoBackup: 1,
+        geradoEm: new Date().toISOString(),
+        usuario: usuarioLogado || localStorage.getItem('driverflux_usuario_logado') || 'não informado',
+        turnoAtivo: idTurnoAtivo || '',
+        metadadosTurno: metadadosTurno || {},
+        localStorage: montarLocalStorageBackupDriverFlux(),
+        dadosAtuais: { registros, pagamentos, despesasTurno, motoristasCadastroMaster },
+        firebase: await coletarFirebaseBackupDriverFlux()
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const nome = 'backup-driverflux-' + new Date().toISOString().slice(0, 10) + '.json';
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    await salvarOuCompartilharBlobDriverFlux(blob, nome, 'Backup DriverFlux', json);
+}
+
+function abrirImportarBackupDriverFlux() {
+    const input = document.getElementById('inputBackupDriverFlux');
+    if (!input) return alert('Campo de importação de backup não encontrado nesta tela.');
+    input.value = '';
+    input.click();
+}
+
+function restaurarBackupDriverFlux(event) {
+    const arq = event?.target?.files?.[0];
+    if (!arq) return;
+    const reader = new FileReader();
+    reader.onload = async function() {
+        try {
+            const backup = JSON.parse(reader.result);
+            if (!backup || backup.app?.indexOf('DriverFlux') === -1) {
+                if (!confirm('Este arquivo não parece ser um backup DriverFlux. Deseja tentar restaurar mesmo assim?')) return;
+            }
+            if (!confirm('Restaurar backup? Isso pode substituir dados locais do aplicativo neste aparelho.')) return;
+
+            if (backup.localStorage && typeof backup.localStorage === 'object') {
+                Object.keys(backup.localStorage).forEach(chave => {
+                    if (chave.startsWith('driverflux_')) localStorage.setItem(chave, backup.localStorage[chave]);
+                });
+            }
+
+            if (backup.firebase && db && confirm('Também restaurar dados na nuvem Firebase? Use apenas se tiver certeza.')) {
+                const paths = ['usuarios', 'turnos_operacionais', 'corridas_por_turno', 'pagamentos', 'despesas_por_turno'];
+                for (const path of paths) {
+                    if (backup.firebase[path] && !backup.firebase[path].erro) await db.ref(path).set(backup.firebase[path]);
+                }
+            }
+
+            alert('✅ Backup restaurado. O aplicativo será recarregado.');
+            location.reload();
+        } catch (e) {
+            alert('❌ Não consegui ler este backup: ' + (e.message || e));
+        }
+    };
+    reader.readAsText(arq);
+}
