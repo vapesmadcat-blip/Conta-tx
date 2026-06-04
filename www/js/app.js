@@ -1425,6 +1425,225 @@ function gerarRelatorio() {
 }
 
 
+function aplicarPeriodoRelatorioDespesa(dias) {
+    const fim = new Date();
+    const inicio = new Date();
+    inicio.setDate(fim.getDate() - (Number(dias) - 1));
+    const inputIni = document.getElementById('relDespesaDataInicial');
+    const inputFim = document.getElementById('relDespesaDataFinal');
+    if (inputIni) inputIni.value = dataIsoLocal(inicio);
+    if (inputFim) inputFim.value = dataIsoLocal(fim);
+    gerarRelatorioDespesas();
+}
+
+function limparPeriodoRelatorioDespesa() {
+    const inputIni = document.getElementById('relDespesaDataInicial');
+    const inputFim = document.getElementById('relDespesaDataFinal');
+    if (inputIni) inputIni.value = '';
+    if (inputFim) inputFim.value = '';
+    gerarRelatorioDespesas();
+}
+
+function obterFiltroPeriodoRelatorioDespesa() {
+    const ini = (document.getElementById('relDespesaDataInicial')?.value || '').trim();
+    const fim = (document.getElementById('relDespesaDataFinal')?.value || '').trim();
+    const inicioMs = ini ? new Date(`${ini}T00:00:00`).getTime() : null;
+    const fimMs = fim ? new Date(`${fim}T23:59:59`).getTime() : null;
+    return { ini, fim, inicioMs, fimMs };
+}
+
+function filtrarDespesasPorPeriodo(lista, periodo) {
+    if (!periodo || (!periodo.inicioMs && !periodo.fimMs)) return [...lista];
+    return lista.filter(item => {
+        const ts = obterTimestampRegistro({ dataHora: item.dataHora, data: item.data, timestamp: item.timestamp || item.criadoEm });
+        if (!ts) return false;
+        if (periodo.inicioMs && ts < periodo.inicioMs) return false;
+        if (periodo.fimMs && ts > periodo.fimMs) return false;
+        return true;
+    });
+}
+
+function abrirRelatorioDespesas() {
+    const card = document.getElementById('cardRelatorioDespesas');
+    const cardRel = document.getElementById('cardRelatorio');
+    const cardTotais = document.getElementById('cardTotais');
+    if (cardRel) cardRel.style.display = 'none';
+    if (cardTotais) cardTotais.style.display = 'none';
+    if (!card) return alert('Tela de relatório de despesas não encontrada.');
+    const campoPrefixo = document.getElementById('relDespesaPrefixo');
+    if (campoPrefixo && !campoPrefixo.value) campoPrefixo.value = (metadadosTurno.prefixoCarro || localStorage.getItem('driverflux_demo_prefixo') || '').toString().toUpperCase();
+    card.style.display = 'block';
+    gerarRelatorioDespesas();
+    setTimeout(() => campoPrefixo?.focus(), 120);
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function fecharRelatorioDespesas() {
+    const card = document.getElementById('cardRelatorioDespesas');
+    if (card) card.style.display = 'none';
+}
+
+async function carregarBaseDespesasRelatorio() {
+    const base = [];
+
+    if (localStorage.getItem('driverflux_modo_demo') === 'true' || !db) {
+        (despesasTurno || []).forEach(d => base.push({
+            ...d,
+            turno: idTurnoAtivo || 'DEMO-LOCAL',
+            motorista: d.motorista || usuarioLogado || 'demo_local',
+            prefixo: d.prefixo || metadadosTurno.prefixoCarro || localStorage.getItem('driverflux_demo_prefixo') || 'DEMO'
+        }));
+        return base;
+    }
+
+    iniciarFirebaseSeNecessario();
+    const [snapTurnos, snapDespesas] = await Promise.all([
+        db.ref('turnos_operacionais').once('value'),
+        db.ref('despesas_por_turno').once('value')
+    ]);
+
+    const mapaTurnos = {};
+    const turnos = snapTurnos.val() || {};
+    Object.keys(turnos).forEach(motorista => {
+        Object.keys(turnos[motorista] || {}).forEach(tId => {
+            const t = turnos[motorista][tId] || {};
+            mapaTurnos[tId] = {
+                motorista,
+                prefixo: t.prefixoCarro || 'N/I',
+                abertura: t.abertura || ''
+            };
+        });
+    });
+
+    const despesasPorTurno = snapDespesas.val() || {};
+    Object.keys(despesasPorTurno).forEach(tId => {
+        const meta = mapaTurnos[tId] || {};
+        Object.keys(despesasPorTurno[tId] || {}).forEach(key => {
+            const d = despesasPorTurno[tId][key] || {};
+            base.push({
+                ...d,
+                fbKey: key,
+                turno: tId,
+                motorista: d.motorista || meta.motorista || 'N/I',
+                prefixo: d.prefixo || meta.prefixo || 'N/I',
+                abertura: meta.abertura || ''
+            });
+        });
+    });
+    return base;
+}
+
+function totaisDespesasLista(lista) {
+    const totais = { gasolina: 0, manutencao: 0, outros: 0, total: 0, qtd: 0 };
+    (lista || []).forEach(d => {
+        const tipo = (d.tipo || 'outros').toString().toLowerCase();
+        const valor = numeroSeguro(d.valor);
+        if (tipo.includes('gas') || tipo.includes('comb')) totais.gasolina += valor;
+        else if (tipo.includes('manut') || tipo.includes('óleo') || tipo.includes('oleo') || tipo.includes('pneu')) totais.manutencao += valor;
+        else totais.outros += valor;
+        totais.total += valor;
+        totais.qtd += 1;
+    });
+    return totais;
+}
+
+function linhasTabelaDespesasRelatorio(lista) {
+    if (!lista.length) {
+        return `<div class="report-list-row"><strong>Nenhuma despesa encontrada para este prefixo/período.</strong><span>-</span></div>`;
+    }
+
+    return `
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>DATA</th>
+                    <th>TIPO</th>
+                    <th>DESCRIÇÃO</th>
+                    <th>MOTORISTA</th>
+                    <th>VALOR</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${lista.map(d => `
+                    <tr>
+                        <td>${escaparHtmlRelatorio(d.dataHora || d.abertura || '-')}</td>
+                        <td>${escaparHtmlRelatorio((d.tipo || 'outros').toString().toUpperCase())}</td>
+                        <td>${escaparHtmlRelatorio(d.descricao || '-')}</td>
+                        <td>${escaparHtmlRelatorio((d.motorista || 'N/I').toString().toUpperCase())}</td>
+                        <td><b>${formatarMoeda(numeroSeguro(d.valor))}</b></td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>`;
+}
+
+async function gerarRelatorioDespesas() {
+    const output = document.getElementById('reportDespesasOutput');
+    const card = document.getElementById('cardRelatorioDespesas');
+    if (!output || !card) return;
+
+    output.innerHTML = '<div class="report-section"><h4>Carregando despesas...</h4></div>';
+    card.style.display = 'block';
+
+    try {
+        const prefixoFiltro = (document.getElementById('relDespesaPrefixo')?.value || '').trim().toUpperCase();
+        const periodo = obterFiltroPeriodoRelatorioDespesa();
+        const base = await carregarBaseDespesasRelatorio();
+        let lista = filtrarDespesasPorPeriodo(base, periodo);
+        if (prefixoFiltro) {
+            lista = lista.filter(d => (d.prefixo || '').toString().toUpperCase().includes(prefixoFiltro));
+        }
+        lista.sort((a, b) => obterTimestampRegistro({ dataHora: b.dataHora, timestamp: b.timestamp || b.criadoEm }) - obterTimestampRegistro({ dataHora: a.dataHora, timestamp: a.timestamp || a.criadoEm }));
+
+        const totais = totaisDespesasLista(lista);
+        const porPrefixo = {};
+        const porMotorista = {};
+        lista.forEach(d => {
+            somarGrupoRelatorio(porPrefixo, (d.prefixo || 'N/I').toString().toUpperCase(), numeroSeguro(d.valor));
+            somarGrupoRelatorio(porMotorista, (d.motorista || 'N/I').toString().toUpperCase(), numeroSeguro(d.valor));
+        });
+
+        output.innerHTML = `
+            <div class="report-pro">
+                <div class="report-head">
+                    <h3>⛽ DriverFlux — Relatório de Despesas</h3>
+                    <p>
+                        Prefixo pesquisado: <b>${escaparHtmlRelatorio(prefixoFiltro || 'Todos')}</b><br>
+                        Período: <b>${escaparHtmlRelatorio(descricaoPeriodoRelatorio(periodo))}</b><br>
+                        Gerado em: ${escaparHtmlRelatorio(new Date().toLocaleString('pt-BR'))}
+                    </p>
+                </div>
+                <div class="report-grid">
+                    <div class="report-card primary"><div class="label">Lançamentos</div><div class="value">${totais.qtd}</div></div>
+                    <div class="report-card danger"><div class="label">Total despesas</div><div class="value">${formatarMoeda(totais.total)}</div></div>
+                    <div class="report-card warning"><div class="label">Gasolina</div><div class="value">${formatarMoeda(totais.gasolina)}</div></div>
+                    <div class="report-card"><div class="label">Manutenção</div><div class="value">${formatarMoeda(totais.manutencao)}</div></div>
+                    <div class="report-card"><div class="label">Outros</div><div class="value">${formatarMoeda(totais.outros)}</div></div>
+                </div>
+                <div class="report-section">
+                    <h4>Totais por Prefixo</h4>
+                    ${linhasGrupoRelatorio(porPrefixo, 'Nenhum prefixo encontrado')}
+                </div>
+                <div class="report-section">
+                    <h4>Totais por Motorista</h4>
+                    ${linhasGrupoRelatorio(porMotorista, 'Nenhum motorista encontrado')}
+                </div>
+                <div class="report-section">
+                    <h4>Detalhamento das Despesas</h4>
+                    ${linhasTabelaDespesasRelatorio(lista)}
+                </div>
+            </div>`;
+    } catch (err) {
+        output.innerHTML = `<div class="report-section"><h4>Erro ao gerar relatório</h4><p>${escaparHtmlRelatorio(err.message || err)}</p></div>`;
+    }
+}
+
+function copiarRelatorioDespesas() {
+    const texto = (document.getElementById('reportDespesasOutput')?.innerText || '').trim();
+    if (!texto) return alert('Gere o relatório de despesas antes de copiar.');
+    copiarTextoDriverFlux(texto, '✅ Relatório de despesas copiado.');
+}
+
 function montarHtmlRelatorioParaImpressao() {
     const output = document.getElementById('reportOutput');
     if (!output || !output.innerHTML.trim()) return '';
