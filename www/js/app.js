@@ -1,6 +1,11 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
  * Lógica de Negócio Completa com Fluxo de Ativação Seguro + Amortização + Consulta Master
+ * 
+ * MODIFICAÇÕES ADICIONADAS:
+ * - Primeiro login obrigatório para MASTER e taxistas
+ * - Cadastro de motoristas com senha provisória automática
+ * - Geração de senha no formato "XX-1234"
  */
 
 const firebaseConfig = {
@@ -703,6 +708,21 @@ function renderizarTabela() {
     });
 }
 
+// ============================================================
+// FUNÇÃO GERAR SENHA PROVISÓRIA (ADICIONADA)
+// ============================================================
+function gerarSenhaProvisoria() {
+    const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const l1 = letras.charAt(Math.floor(Math.random() * letras.length));
+    const l2 = letras.charAt(Math.floor(Math.random() * letras.length));
+    const num = Math.floor(1000 + Math.random() * 9000);
+    return `${l1}${l2}-${num}`;
+}
+// ============================================================
+
+// ============================================================
+// FUNÇÃO REALIZAR LOGIN MODIFICADA (COM VERIFICAÇÃO DE PRIMEIRO ACESSO)
+// ============================================================
 function realizarLogin() {
     const btn = document.getElementById('btnLogin');
     if (btn && btn.disabled) return;
@@ -721,7 +741,28 @@ function realizarLogin() {
             const dadosUser = snapshot.val();
             const senhaCorreta = (typeof dadosUser === 'object') ? dadosUser.senha : dadosUser;
             if (senhaCorreta === pass) { 
-                localStorage.setItem('driverflux_usuario_logado', user); 
+                localStorage.setItem('driverflux_usuario_logado', user);
+                
+                // ============================================
+                // VERIFICAÇÃO DE PRIMEIRO LOGIN (ADICIONADA)
+                // ============================================
+                // Verificar se é MASTER com primeiroLoginMaster = true
+                if (user === 'master' && dadosUser.primeiroLoginMaster === true) {
+                    localStorage.setItem('driverflux_temp_user', user);
+                    localStorage.setItem('driverflux_temp_isMaster', 'true');
+                    window.location.href = 'trocar-senha.html';
+                    return;
+                }
+                
+                // Verificar se é taxista com primeiroLogin = true
+                if (dadosUser.primeiroLogin === true && user !== 'master') {
+                    localStorage.setItem('driverflux_temp_user', user);
+                    localStorage.setItem('driverflux_temp_isMaster', 'false');
+                    window.location.href = 'trocar-senha.html';
+                    return;
+                }
+                // ============================================
+                
                 verificarSessaoLogin(); 
             } else { alert("❌ Senha incorreta!"); if (btn) { btn.disabled = false; btn.innerHTML = "🔑 Entrar no Sistema"; } }
         } else { alert("❌ Usuário não cadastrado!"); if (btn) { btn.disabled = false; btn.innerHTML = "🔑 Entrar no Sistema"; } }
@@ -730,6 +771,7 @@ function realizarLogin() {
         if (btn) { btn.disabled = false; btn.innerHTML = "🔑 Entrar no Sistema"; }
     });
 }
+// ============================================================
 
 
 function abrirModalDespesaTurno() {
@@ -887,6 +929,11 @@ function calcularAcertoMotoristaFechamento() {
 }
 
 function formatarMoeda(valor) { return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+function numeroSeguro(valor) {
+    if (typeof valor === 'string') valor = valor.replace(',', '.');
+    const n = parseFloat(valor);
+    return isNaN(n) ? 0 : n;
+}
 
 function inicializarMotorista() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
@@ -983,22 +1030,52 @@ function atualizarCamposTipoPagamentoMotorista() {
     if (boxValorKm) boxValorKm.style.display = tipo === 'quilometragem' ? 'block' : 'none';
 }
 
+// ============================================================
+// FUNÇÃO SALVAR NOVO MOTORISTA MODIFICADA (COM SENHA PROVISÓRIA)
+// ============================================================
 function salvarNovoMotoristaMaster() {
     const userRaw = (document.getElementById('novoMotoristaUsuario')?.value || '').trim();
-    const pass = (document.getElementById('novoMotoristaSenha')?.value || '').trim();
+    const senhaDigitada = (document.getElementById('novoMotoristaSenha')?.value || '').trim();
     const tipo = (document.getElementById('novoMotoristaTipo')?.value || 'comissionado').trim().toLowerCase();
     const prefixo = (document.getElementById('novoMotoristaPrefixo')?.value || '').trim();
     const comissaoPercentual = numeroSeguro(document.getElementById('novoMotoristaComissao')?.value || 0);
     const valorKmDono = numeroSeguro(document.getElementById('novoMotoristaValorKm')?.value || 0);
 
     if (!userRaw) return alert('⚠️ Informe o nome de usuário do motorista.');
-    if (!pass) return alert('⚠️ Informe uma senha para o motorista.');
+    
+    // Se o Master não digitou uma senha, gerar automática
+    let senhaFinal = senhaDigitada;
+    let senhaProvisoriaGerada = false;
+    
+    if (!senhaFinal) {
+        senhaFinal = gerarSenhaProvisoria();
+        senhaProvisoriaGerada = true;
+    }
+    
+    if (!senhaFinal) return alert('⚠️ Informe uma senha para o motorista ou deixe em branco para gerar automática.');
+
     if (tipo === 'comissionado' && comissaoPercentual <= 0) return alert('⚠️ Informe a porcentagem da comissão do motorista.');
     if (tipo === 'quilometragem' && valorKmDono <= 0) return alert('⚠️ Informe o valor por KM que o motorista paga ao dono do carro.');
 
     const user = userRaw.toLowerCase().replace(/\s+/g, '_');
-    const payload = { senha: pass, tipo: tipo, tipoPagamentoMotorista: tipo, comissaoPercentual: comissaoPercentual, valorKmDono: valorKmDono };
-    if (prefixo) payload.prefixoCarro = prefixo.toUpperCase();
+    
+    // Adicionar pontoId
+    const pontoId = localStorage.getItem('driverflux_ponto_id') || 'PONTO-0001';
+    
+    const payload = { 
+        senha: senhaFinal,
+        tipo: tipo,
+        tipoPagamentoMotorista: tipo,
+        comissaoPercentual: comissaoPercentual,
+        valorKmDono: valorKmDono,
+        primeiroLogin: true,      // NOVO - força troca de senha no primeiro acesso
+        pontoId: pontoId          // NOVO - associa ao ponto
+    };
+    
+    if (prefixo) {
+        payload.prefixoCarro = prefixo.toUpperCase();
+        payload.prefixo = prefixo.toUpperCase();
+    }
 
     iniciarFirebaseSeNecessario();
     db.ref(`usuarios/${user}`).once('value').then(snapshot => {
@@ -1009,15 +1086,38 @@ function salvarNovoMotoristaMaster() {
     }).then(resultado => {
         if (resultado === null) return;
         fecharModalCadastroMotorista();
-        alert(`✅ Motorista ${user.toUpperCase()} cadastrado com sucesso!`);
+        
+        // Mostrar senha provisória se foi gerada automaticamente
+        if (senhaProvisoriaGerada) {
+            alert(`✅ Motorista ${user.toUpperCase()} cadastrado!\n\n🔐 SENHA PROVISÓRIA: ${senhaFinal}\n\n⚠️ O motorista será obrigado a trocar a senha no primeiro acesso.`);
+        } else {
+            alert(`✅ Motorista ${user.toUpperCase()} cadastrado com sucesso!`);
+        }
     }).catch(err => {
         alert('Erro ao cadastrar motorista: ' + err.message);
     });
 }
+// ============================================================
 
 function garantirUsuariosBaseNoFirebase() {
     db.ref('usuarios/master').once('value').then(snap => {
-        if (!snap.exists()) { db.ref('usuarios/master').set({ senha: '123', tipo: 'master' }); }
+        if (!snap.exists()) { 
+            db.ref('usuarios/master').set({ 
+                senha: '123', 
+                tipo: 'master',
+                primeiroLoginMaster: true,  // NOVO
+                pontoId: 'PONTO-0001'       // NOVO
+            }); 
+        } else {
+            // Se o master já existe mas não tem os novos campos, adicionar
+            const existing = snap.val();
+            if (existing.primeiroLoginMaster === undefined) {
+                db.ref('usuarios/master').update({ primeiroLoginMaster: true });
+            }
+            if (existing.pontoId === undefined) {
+                db.ref('usuarios/master').update({ pontoId: 'PONTO-0001' });
+            }
+        }
     });
 }
 
@@ -1194,12 +1294,6 @@ function descricaoPeriodoRelatorio(periodo) {
     if (periodo.ini && periodo.fim) return `${formatarDataIsoRelatorio(periodo.ini)} até ${formatarDataIsoRelatorio(periodo.fim)}`;
     if (periodo.ini) return `A partir de ${formatarDataIsoRelatorio(periodo.ini)}`;
     return `Até ${formatarDataIsoRelatorio(periodo.fim)}`;
-}
-
-function numeroSeguro(valor) {
-    if (typeof valor === 'string') valor = valor.replace(',', '.');
-    const n = parseFloat(valor);
-    return isNaN(n) ? 0 : n;
 }
 
 function obterRegimeMotoristaAtual() {
@@ -2801,3 +2895,31 @@ async function imprimirRelatorioPDF() {
     // No Android WebView, window.print costuma falhar. Aqui geramos PDF real.
     await salvarRelatorioComoArquivo();
 }
+
+
+// ===== FASE 1 MASTER/PONTO =====
+function mostrarCadastroInicialMaster(){
+ const ja=localStorage.getItem('driverflux_ponto_id');
+ if(!ja){
+   const el=document.getElementById('cadastroInicialMaster');
+   if(el) el.style.display='block';
+ }
+}
+function criarPontoInicialMaster(){
+ const nome=(document.getElementById('pontoInicialNome')||{}).value||'Centro';
+ const pontoId='PONTO-0001';
+ localStorage.setItem('driverflux_ponto_id',pontoId);
+ localStorage.setItem('driverflux_ponto_nome',nome);
+ localStorage.setItem('driverflux_master_usuario','MASTER');
+ localStorage.setItem('driverflux_master_senha','1');
+ localStorage.setItem('driverflux_prefixos',JSON.stringify([]));
+ const el=document.getElementById('cadastroInicialMaster');
+ if(el) el.style.display='none';
+ alert('Ponto criado: '+nome);
+}
+function cadastrarPrefixoNoPonto(prefixo){
+ const arr=JSON.parse(localStorage.getItem('driverflux_prefixos')||'[]');
+ arr.push({pontoId:localStorage.getItem('driverflux_ponto_id'),prefixo:String(prefixo)});
+ localStorage.setItem('driverflux_prefixos',JSON.stringify(arr));
+}
+document.addEventListener('DOMContentLoaded',()=>setTimeout(mostrarCadastroInicialMaster,500));
