@@ -36,8 +36,38 @@ let usuarioLogado = "";
 let idTurnoAtivo = "";          
 let metadadosTurno = { trocoInicial: 0, kmInicial: 0, status: "fechado", tipoContrato: "efetivo", prefixoCarro: "Não informado" };
 let motoristasCadastroMaster = {};
+let pontoAtualGlobal = null;
 
 const LIMITE_DEMO = 10;
+
+/**
+ * Fonte única da verdade para o ponto atual do Master.
+ * Unifica: metadadosTurno.ponto + localStorage 'driverflux_ponto_atual' + fallback antigo.
+ */
+function obterPontoAtual() {
+    if (pontoAtualGlobal) return pontoAtualGlobal;
+
+    if (metadadosTurno && metadadosTurno.ponto) {
+        pontoAtualGlobal = metadadosTurno.ponto;
+        return pontoAtualGlobal;
+    }
+
+    const salvo = localStorage.getItem('driverflux_ponto_atual');
+    if (salvo) {
+        pontoAtualGlobal = salvo;
+        return salvo;
+    }
+
+    // Fallback para instalações antigas
+    const nomeAntigo = localStorage.getItem('driverflux_ponto_nome');
+    if (nomeAntigo) {
+        localStorage.setItem('driverflux_ponto_atual', nomeAntigo);
+        pontoAtualGlobal = nomeAntigo;
+        return nomeAntigo;
+    }
+
+    return null;
+}
 
 
 function motoristaDoTurnoAtual() {
@@ -200,6 +230,7 @@ function verificarSessaoLogin() {
                 document.getElementById('painelFiltroMaster').style.display = 'block';
                 document.getElementById('lblUsuarioAtivo').innerText = `Operador: ${usuarioLogado.toUpperCase()}`;
                 inicializarMaster();
+                garantirPontoMasterCarregado();   // ← garante que o ponto aparece mesmo sem turno aberto
             } else {
                 document.getElementById('painelFiltroMaster').style.display = 'none';
                 document.getElementById('lblUsuarioAtivo').innerText = `Operador: ${usuarioLogado.toUpperCase()} ({contratoStr})`;
@@ -2915,33 +2946,87 @@ async function imprimirRelatorioPDF() {
 }
 
 
-// ===== FASE 1 MASTER/PONTO =====
-function mostrarCadastroInicialMaster(){
- const ja=localStorage.getItem('driverflux_ponto_id');
- if(!ja){
-   const el=document.getElementById('cadastroInicialMaster');
-   if(el) el.style.display='block';
- }
-}
-function criarPontoInicialMaster(){
- const nome=(document.getElementById('pontoInicialNome')||{}).value||'Centro';
- const pontoId='PONTO-0001';
- localStorage.setItem('driverflux_ponto_id',pontoId);
- localStorage.setItem('driverflux_ponto_nome',nome);
- localStorage.setItem('driverflux_master_usuario','MASTER');
- localStorage.setItem('driverflux_master_senha','1');
- localStorage.setItem('driverflux_prefixos',JSON.stringify([]));
- const el=document.getElementById('cadastroInicialMaster');
- if(el) el.style.display='none';
- alert('Ponto criado: '+nome);
-}
-function cadastrarPrefixoNoPonto(prefixo){
- const arr=JSON.parse(localStorage.getItem('driverflux_prefixos')||'[]');
- arr.push({pontoId:localStorage.getItem('driverflux_ponto_id'),prefixo:String(prefixo)});
- localStorage.setItem('driverflux_prefixos',JSON.stringify(arr));
-}
-document.addEventListener('DOMContentLoaded',()=>setTimeout(mostrarCadastroInicialMaster,500));
+// ==================== PONTO / MASTER - CORRIGIDO (persistência real no primeiro cadastro) ====================
 
+/**
+ * Garante que o Master sempre tenha o ponto carregado (mesmo sem turno aberto)
+ */
+function garantirPontoMasterCarregado() {
+    if (usuarioLogado !== 'master') return;
+
+    const ponto = obterPontoAtual();
+    if (ponto && !metadadosTurno.ponto) {
+        metadadosTurno.ponto = ponto;
+    }
+}
+
+/**
+ * Mostra o card de cadastro inicial do ponto apenas na primeira execução
+ */
+function mostrarCadastroInicialMaster() {
+    const jaTemPonto = localStorage.getItem('driverflux_ponto_atual') || localStorage.getItem('driverflux_ponto_id');
+    if (!jaTemPonto) {
+        const el = document.getElementById('cadastroInicialMaster');
+        if (el) el.style.display = 'block';
+    }
+}
+
+/**
+ * Cria o ponto na PRIMEIRA execução do Master (corrigido para salvar de verdade)
+ */
+async function criarPontoInicialMaster() {
+    const nomeInput = (document.getElementById('pontoInicialNome') || {}).value || '';
+    const nome = nomeInput.trim() || 'Centro';
+
+    const pontoId = 'ponto-0001'; // ID fixo e limpo
+
+    try {
+        // 1. Salva no localStorage (fonte principal)
+        localStorage.setItem('driverflux_ponto_atual', nome);
+        localStorage.setItem('driverflux_ponto_id', pontoId);
+        localStorage.setItem('driverflux_ponto_nome', nome); // compatibilidade
+
+        // 2. Atualiza variável global
+        pontoAtualGlobal = nome;
+        metadadosTurno.ponto = nome;
+
+        // 3. Cria/atualiza o documento do ponto no Firebase
+        if (db) {
+            await db.ref(`pontos/${pontoId}`).set({
+                nome: nome,
+                criadoEm: new Date().toISOString(),
+                master: usuarioLogado || 'master'
+            });
+
+            // 4. Atualiza o registro do próprio Master com o ponto
+            if (usuarioLogado) {
+                await db.ref(`usuarios/${usuarioLogado}`).update({
+                    ponto: nome,
+                    pontoId: pontoId
+                });
+            }
+        }
+
+        // 5. Esconde o card de cadastro inicial
+        const el = document.getElementById('cadastroInicialMaster');
+        if (el) el.style.display = 'none';
+
+        alert('✅ Ponto "' + nome + '" criado com sucesso!\n\nAgora você pode cadastrar motoristas e prefixos.');
+
+        // Recarrega a interface do Master para refletir o ponto
+        if (usuarioLogado === 'master') {
+            garantirPontoMasterCarregado();
+        }
+
+    } catch (erro) {
+        console.error('Erro ao criar ponto inicial:', erro);
+        alert('❌ Erro ao criar o ponto: ' + (erro.message || erro));
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(mostrarCadastroInicialMaster, 600);
+});
 
 // ==================== GERENCIAMENTO DE PREFIXO DE CARRO ====================
 
@@ -2950,37 +3035,38 @@ function abrirModalCadastroPrefixo() {
         alert('🔒 Apenas o MASTER pode cadastrar prefixos.');
         return;
     }
-    document.getElementById('inputPrefixoPlaca').value = '';
-    document.getElementById('inputPrefixoModelo').value = '';
-    document.getElementById('inputPrefixoCor').value = '';
-    document.getElementById('modalCadastroPrefixo').style.display = 'flex';
+    const elPlaca = document.getElementById('inputPrefixoPlaca');
+    const elModelo = document.getElementById('inputPrefixoModelo');
+    const elCor = document.getElementById('inputPrefixoCor');
+
+    if (elPlaca) elPlaca.value = '';
+    if (elModelo) elModelo.value = '';
+    if (elCor) elCor.value = '';
+
+    const modal = document.getElementById('modalCadastroPrefixo');
+    if (modal) modal.style.display = 'flex';
 }
 
 function fecharModalCadastroPrefixo() {
-    document.getElementById('modalCadastroPrefixo').style.display = 'none';
+    const modal = document.getElementById('modalCadastroPrefixo');
+    if (modal) modal.style.display = 'none';
 }
 
 async function salvarNovoPrefixo() {
-    const placa = document.getElementById('inputPrefixoPlaca').value.trim().toUpperCase();
-    const modelo = document.getElementById('inputPrefixoModelo').value.trim();
-    const cor = document.getElementById('inputPrefixoCor').value.trim();
+    const placa = (document.getElementById('inputPrefixoPlaca')?.value || '').trim().toUpperCase();
+    const modelo = (document.getElementById('inputPrefixoModelo')?.value || '').trim();
+    const cor = (document.getElementById('inputPrefixoCor')?.value || '').trim();
 
-    if (!placa) {
-        alert('⚠️ Digite a placa do carro.');
-        return;
-    }
-    if (!modelo) {
-        alert('⚠️ Digite o modelo do carro.');
+    if (!placa) { alert('⚠️ Digite a placa do carro.'); return; }
+    if (!modelo) { alert('⚠️ Digite o modelo do carro.'); return; }
+
+    const pontoAtual = obterPontoAtual();
+    if (!pontoAtual) {
+        alert('❌ Ponto não identificado.\n\nPor favor, faça o cadastro inicial do ponto primeiro (na primeira execução).');
         return;
     }
 
     try {
-        const pontoAtual = metadadosTurno.ponto || localStorage.getItem('driverflux_ponto_atual');
-        if (!pontoAtual) {
-            alert('❌ Ponto não identificado. Faça login novamente.');
-            return;
-        }
-
         const pontoId = pontoAtual.toLowerCase().replace(/\s+/g, '_');
         const prefixoId = placa.replace(/[^A-Z0-9]/g, '');
 
@@ -2992,8 +3078,9 @@ async function salvarNovoPrefixo() {
             ativo: true
         });
 
-        alert('✅ Prefixo ' + placa + ' cadastrado com sucesso!');
+        alert('✅ Prefixo ' + placa + ' cadastrado com sucesso no ponto "' + pontoAtual + '"!');
         fecharModalCadastroPrefixo();
+
     } catch (erro) {
         console.error('Erro ao salvar prefixo:', erro);
         alert('❌ Erro ao salvar prefixo: ' + (erro.message || erro));
@@ -3008,51 +3095,58 @@ function abrirModalGerenciamentoPonto() {
         return;
     }
 
-    // Carregar dados atuais do ponto
-    const pontoAtual = metadadosTurno.ponto || localStorage.getItem('driverflux_ponto_atual');
+    const pontoAtual = obterPontoAtual();
     if (!pontoAtual) {
-        alert('❌ Ponto não identificado. Faça login novamente.');
+        alert('❌ Nenhum ponto cadastrado ainda.\n\nFaça o cadastro inicial do ponto na primeira execução do app.');
         return;
     }
 
     const pontoId = pontoAtual.toLowerCase().replace(/\s+/g, '_');
 
     db.ref(`pontos/${pontoId}`).once('value').then((snapshot) => {
-        const dadosPonto = snapshot.val() || {};
-        document.getElementById('inputPontoNome').value = dadosPonto.nome || pontoAtual;
-        document.getElementById('inputPontoTelefone').value = dadosPonto.telefone || '';
-        document.getElementById('inputPontoEndereco').value = dadosPonto.endereco || '';
-        document.getElementById('inputPontoCidade').value = dadosPonto.cidade || '';
-        document.getElementById('modalGerenciamentoPonto').style.display = 'flex';
+        const dados = snapshot.val() || {};
+        const elNome = document.getElementById('inputPontoNome');
+        const elTel = document.getElementById('inputPontoTelefone');
+        const elEnd = document.getElementById('inputPontoEndereco');
+        const elCid = document.getElementById('inputPontoCidade');
+
+        if (elNome) elNome.value = dados.nome || pontoAtual;
+        if (elTel) elTel.value = dados.telefone || '';
+        if (elEnd) elEnd.value = dados.endereco || '';
+        if (elCid) elCid.value = dados.cidade || '';
+
+        const modal = document.getElementById('modalGerenciamentoPonto');
+        if (modal) modal.style.display = 'flex';
     }).catch((erro) => {
-        console.error('Erro ao carregar dados do ponto:', erro);
+        console.error('Erro ao carregar ponto:', erro);
         alert('❌ Erro ao carregar dados do ponto.');
     });
 }
 
 function fecharModalGerenciamentoPonto() {
-    document.getElementById('modalGerenciamentoPonto').style.display = 'none';
+    const modal = document.getElementById('modalGerenciamentoPonto');
+    if (modal) modal.style.display = 'none';
 }
 
 async function salvarAlteracoesPonto() {
-    const nome = document.getElementById('inputPontoNome').value.trim();
-    const telefone = document.getElementById('inputPontoTelefone').value.trim();
-    const endereco = document.getElementById('inputPontoEndereco').value.trim();
-    const cidade = document.getElementById('inputPontoCidade').value.trim();
+    const nome = (document.getElementById('inputPontoNome')?.value || '').trim();
+    const telefone = (document.getElementById('inputPontoTelefone')?.value || '').trim();
+    const endereco = (document.getElementById('inputPontoEndereco')?.value || '').trim();
+    const cidade = (document.getElementById('inputPontoCidade')?.value || '').trim();
 
     if (!nome) {
         alert('⚠️ Digite o nome do ponto.');
         return;
     }
 
-    try {
-        const pontoAtual = metadadosTurno.ponto || localStorage.getItem('driverflux_ponto_atual');
-        if (!pontoAtual) {
-            alert('❌ Ponto não identificado. Faça login novamente.');
-            return;
-        }
+    const pontoAtualAntigo = obterPontoAtual();
+    if (!pontoAtualAntigo) {
+        alert('❌ Ponto não identificado.');
+        return;
+    }
 
-        const pontoId = pontoAtual.toLowerCase().replace(/\s+/g, '_');
+    try {
+        const pontoId = pontoAtualAntigo.toLowerCase().replace(/\s+/g, '_');
 
         const updates = {
             nome: nome,
@@ -3064,17 +3158,23 @@ async function salvarAlteracoesPonto() {
 
         await db.ref(`pontos/${pontoId}`).update(updates);
 
-        // Atualizar também no usuário MASTER
-        await db.ref(`usuarios/${usuarioLogado}`).update({
-            ponto: nome
-        });
+        // Atualiza localStorage e global
+        localStorage.setItem('driverflux_ponto_atual', nome);
+        pontoAtualGlobal = nome;
+        metadadosTurno.ponto = nome;
 
-        alert('✅ Dados do ponto atualizados com sucesso!');
+        // Atualiza no perfil do Master
+        if (usuarioLogado) {
+            await db.ref(`usuarios/${usuarioLogado}`).update({ ponto: nome });
+        }
+
+        alert('✅ Ponto atualizado com sucesso para "' + nome + '"!');
         fecharModalGerenciamentoPonto();
+
     } catch (erro) {
-        console.error('Erro ao salvar alterações do ponto:', erro);
+        console.error('Erro ao salvar ponto:', erro);
         alert('❌ Erro ao salvar alterações: ' + (erro.message || erro));
     }
 }
 
-// ==================== FIM GERENCIAMENTO DE PREFIXO E PONTO ====================
+// ==================== FIM GERENCIAMENTO DE PONTO ====================
