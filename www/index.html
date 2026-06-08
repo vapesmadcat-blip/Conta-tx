@@ -50,6 +50,38 @@
         .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
         .search-box input { flex: 1; padding: 12px; border: 2px solid var(--primary); border-radius: 10px; font-size: 15px; outline: none; }
 
+        .autocomplete-wrap { position: relative; flex: 1; }
+        .autocomplete-wrap input { width: 100%; }
+        .suggestion-box {
+            display: none;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: calc(100% + 6px);
+            z-index: 50;
+            max-height: 190px;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+            padding: 6px;
+        }
+        .suggestion-item {
+            width: 100%;
+            text-align: left;
+            justify-content: flex-start;
+            background: #f8fafc;
+            color: #1e293b;
+            border-radius: 10px;
+            padding: 11px 12px;
+            margin-bottom: 5px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .suggestion-item small { color: #64748b; font-weight: 600; margin-left: auto; }
+        .suggestion-empty { padding: 10px 12px; font-size: 13px; color: #64748b; }
+
         .client-ledger-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; display: none; }
         .ledger-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
         .ledger-row.balance { font-weight: 800; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 8px; }
@@ -64,11 +96,68 @@
         .danger-text { color: var(--danger); font-weight: 600; }
         .success-text { color: var(--success); font-weight: 600; }
 
+
+        .driver-form-head { display:flex; align-items:center; gap:12px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid #e2e8f0; }
+        .driver-avatar { width:48px; height:48px; border-radius:16px; background:#e0e7ff; color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:900; }
+        .driver-subtitle { font-size:13px; color:var(--texto-secundario); margin-top:3px; line-height:1.35; }
+        .driver-grid { display:grid; grid-template-columns:1fr; gap:12px; }
+        .driver-mini-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; }
+        .driver-mini-card label { color:#475569; }
+        .driver-help { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:12px; padding:10px 12px; font-size:12px; font-weight:700; line-height:1.35; margin-top:4px; }
+        .driver-actions { display:flex; gap:10px; margin-top:18px; }
+        .driver-actions button { min-height:46px; }
+        .finance-note { background:#eef2ff; border:1px solid #c7d2fe; color:#3730a3; border-radius:12px; padding:10px 12px; font-size:12px; font-weight:800; line-height:1.35; margin-bottom:10px; }
+        .btn-secondary-clean { background:#e2e8f0; color:#334155; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
         .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 460px; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         
-        .report-output { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: none; }
+
+        .report-filter-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; margin-bottom:12px; }
+        .report-filter-title { font-size:13px; font-weight:900; color:#334155; margin-bottom:8px; }
+        .report-quick-buttons { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:10px; }
+        .report-quick-buttons button { background:#e0e7ff; color:#3730a3; font-weight:900; padding:10px 6px; }
+        .report-date-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .report-date-grid label { font-size:11px; font-weight:800; color:#64748b; display:block; margin-bottom:4px; }
+        .report-date-grid input { width:100%; padding:10px; border:2px solid #e2e8f0; border-radius:10px; font-size:14px; }
+        .report-filter-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+        .history-note { font-size:12px; color:#64748b; font-weight:700; margin: -4px 0 10px; }
+        .backup-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; margin-bottom:16px; }
+        .backup-box h2 { margin-bottom:8px; }
+        .backup-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .backup-help { font-size:12px; color:#64748b; font-weight:700; line-height:1.35; margin-bottom:10px; }
+
+        .report-output { display: none; }
+        .report-pro { background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; }
+        .report-head { background:linear-gradient(135deg, #4f46e5, #111827); color:white; padding:18px; }
+        .report-head h3 { font-size:20px; margin-bottom:4px; }
+        .report-head p { font-size:12px; opacity:.9; line-height:1.4; }
+        .report-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:14px; }
+        .report-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; }
+        .report-card .label { font-size:11px; color:#64748b; font-weight:800; text-transform:uppercase; margin-bottom:4px; }
+        .report-card .value { font-size:19px; font-weight:900; color:#1e293b; }
+        .report-card.primary { background:#eef2ff; border-color:#c7d2fe; }
+        .report-card.success { background:#ecfdf5; border-color:#bbf7d0; }
+        .report-card.danger { background:#fef2f2; border-color:#fecaca; }
+        .report-card.warning { background:#fffbeb; border-color:#fde68a; }
+        .report-section { padding:14px; border-top:1px solid #e2e8f0; }
+        .report-section h4 { font-size:14px; margin-bottom:10px; color:#334155; display:flex; justify-content:space-between; gap:8px; }
+        .report-list-row { display:flex; justify-content:space-between; align-items:center; gap:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+        .report-list-row strong { color:#0f172a; }
+        .report-list-row span { font-weight:900; color:#4f46e5; white-space:nowrap; }
+        .report-table { width:100%; border-collapse:separate; border-spacing:0 6px; }
+        .report-table th { font-size:10px; color:#64748b; padding:6px; border:none; }
+        .report-table td { background:#f8fafc; border:none; padding:9px 6px; font-size:12px; }
+        .report-toolbar { display:flex; gap:8px; margin-top:12px; }
+        .report-toolbar button { flex:1; }
+        @media print {
+            body { background:white; padding:0; }
+            body * { visibility:hidden; }
+            #cardRelatorio, #cardRelatorio * { visibility:visible; }
+            #cardRelatorio { display:block !important; position:absolute; left:0; top:0; width:100%; box-shadow:none; margin:0; border-radius:0; }
+            .no-print { display:none !important; }
+        }
     </style>
 </head>
 <body>
@@ -90,11 +179,11 @@
         <h2 style="text-align: center; margin-bottom: 15px;">Acesso ao Turno</h2>
         <div class="input-group">
             <label>Identificação / Motorista</label>
-            <input type="text" id="loginUsuario" placeholder="Ex: andre, pedro ou master" autocomplete="off">
+            <input type="text" id="loginUsuario" placeholder="Ex: andre, pedro ou master" autocomplete="off" value="master">
         </div>
         <div class="input-group">
             <label>Senha de Acesso</label>
-            <input type="password" id="loginSenha" placeholder="******">
+            <input type="password" id="loginSenha" placeholder="******" value="123">
         </div>
         <button id="btnLogin" class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
     </div>
@@ -139,20 +228,33 @@
             </button>
             
             <button class="btn-relatorio" style="width: 100%; background: var(--primary);" onclick="cadastrarNovoMotoristaMaster()">👤 Cadastrar Novo Motorista</button>
+            
+            <!-- NOVOS BOTÕES DE GERENCIAMENTO -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+                <button class="btn-relatorio" style="background: #0891b2; color: white;" onclick="abrirModalCadastroPrefixo()">🚗 Cadastrar Prefixo</button>
+                <button class="btn-relatorio" style="background: #7c3aed; color: white;" onclick="abrirModalGerenciamentoPonto()">📍 Gerenciar Ponto</button>
+            </div>
         </div>
 
         <div class="btn-grid-actions">
             <button class="btn-incluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
+            <button class="btn-relatorio" style="background:#f59e0b; color:white;" onclick="abrirModalDespesaTurno()">⛽ Despesa</button>
             <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
             <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
             <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
+            <button class="btn-relatorio" style="background:#0f766e; color:white;" onclick="abrirRelatorioDespesas()">📋 Rel. Despesa</button>
+            <button class="btn-relatorio" style="background:#0369a1; color:white;" onclick="fazerBackupDriverFlux()">💾 Backup</button>
+            <button class="btn-relatorio" style="background:#475569; color:white;" onclick="abrirImportarBackupDriverFlux()">♻️ Restaurar</button>
         </div>
+        <input type="file" id="inputBackupDriverFlux" accept="application/json,.json" style="display:none" onchange="restaurarBackupDriverFlux(event)">
 
         <!-- BARRA DE PESQUISA DE CLIENTES -->
         <div class="search-container" id="containerPesquisa">
             <div class="search-box">
-                <input type="text" id="inputPesquisa" placeholder="Buscar cliente no crédito..." list="listaClientesConsulta" oninput="processarConsultaCliente()">
-                <datalist id="listaClientesConsulta"></datalist>
+                <div class="autocomplete-wrap">
+                    <input type="text" id="inputPesquisa" placeholder="Digite o cliente para pagar..." autocomplete="off" oninput="processarConsultaCliente()" onfocus="mostrarSugestoesPagamento()">
+                    <div id="listaClientesPagamento" class="suggestion-box"></div>
+                </div>
                 <button onclick="limparConsulta()" style="background:#e2e8f0; padding:0 10px; border-radius:10px;">X</button>
             </div>
             <div class="client-ledger-box" id="fichaCliente">
@@ -169,7 +271,8 @@
 
         <!-- TABELA DE CORRIDAS -->
         <div class="card">
-            <h2 id="tituloTabela">Corridas do Turno Atual</h2>
+            <h2 id="tituloTabela">Últimas 10 corridas</h2>
+            <div class="history-note">Mais recentes primeiro. O relatório continua considerando o período selecionado.</div>
             <div class="table-wrapper">
                 <table id="tabelaDados">
                     <thead>
@@ -195,6 +298,27 @@
             <div class="result-row"><span>Dinheiro Emprestado:</span> <span id="totBruto">R$ 0,00</span></div>
             <div class="result-row"><span>Taxa do Ponto (+20%):</span> <span id="totAcrescimo" class="danger-text">+ R$ 0,00</span></div>
             <div class="result-row total-final"><span>Dinheiro Vivo Esperado:</span> <span id="totGeral">R$ 0,00</span></div>
+
+            <div style="margin-top:16px; padding-top:14px; border-top:1px dashed #cbd5e1;">
+                <h2 style="margin-bottom:10px;">Despesas do Turno</h2>
+                <div class="result-row"><span>Gasolina:</span> <span id="totDespesaGasolina" class="danger-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Manutenção:</span> <span id="totDespesaManutencao" class="danger-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Outras despesas:</span> <span id="totDespesaOutros" class="danger-text">R$ 0,00</span></div>
+                <div class="result-row total-final"><span>Total de Despesas:</span> <span id="totDespesas">R$ 0,00</span></div>
+            </div>
+
+            <div style="margin-top:16px; padding-top:14px; border-top:1px dashed #cbd5e1;">
+                <h2 style="margin-bottom:10px;">Acerto Motorista / Dono</h2>
+                <div class="finance-note" id="labelRegimeMotorista">Regime não informado</div>
+                <div class="input-group" id="boxKmFechamento" style="display:none;">
+                    <label>🚗 Hodômetro Final</label>
+                    <input type="number" id="inputKmFinalFechamento" placeholder="KM no encerramento" oninput="calcularAcertoMotoristaFechamento()">
+                </div>
+                <div class="result-row"><span>Resumo do acerto:</span> <span id="totResumoAcerto" style="text-align:right; max-width:60%; font-weight:800;">-</span></div>
+                <div class="result-row"><span>Motorista fica/recebe:</span> <span id="totValorMotorista" class="success-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Dono do carro:</span> <span id="totValorDono" class="success-text">R$ 0,00</span></div>
+                <div class="result-row"><span>Líquido após despesas:</span> <span id="totLiquidoAposDespesas">R$ 0,00</span></div>
+            </div>
             
             <!-- BOTÕES DE FECHAMENTO (COM CANCELAR) -->
             <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -208,9 +332,76 @@
         </div>
 
         <div class="card" id="cardRelatorio" style="display: none;">
-            <h2>Relatório de Turno</h2>
+            <h2>Relatório Profissional de Turno</h2>
+            <div class="report-filter-box no-print">
+                <div class="report-filter-title">📅 Período do relatório</div>
+                <div class="report-quick-buttons">
+                    <button type="button" onclick="aplicarPeriodoRelatorio(7)">7 dias</button>
+                    <button type="button" onclick="aplicarPeriodoRelatorio(15)">15 dias</button>
+                    <button type="button" onclick="aplicarPeriodoRelatorio(30)">30 dias</button>
+                </div>
+                <div class="report-date-grid">
+                    <div>
+                        <label>Data inicial</label>
+                        <input type="date" id="relDataInicial">
+                    </div>
+                    <div>
+                        <label>Data final</label>
+                        <input type="date" id="relDataFinal">
+                    </div>
+                </div>
+                <div class="report-filter-actions">
+                    <button type="button" class="btn-relatorio" onclick="gerarRelatorio()">Gerar relatório</button>
+                    <button type="button" style="background:#e2e8f0; color:#334155;" onclick="limparPeriodoRelatorio()">Tudo</button>
+                </div>
+            </div>
             <div class="report-output" id="reportOutput"></div>
-            <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir Fechamento</button>
+            <div class="report-toolbar no-print">
+                <button class="btn-relatorio" onclick="imprimirRelatorioPDF()">🖨️ Imprimir / PDF</button>
+                <button class="btn-relatorio" style="background:#0f766e; color:white;" onclick="salvarRelatorioComoArquivo()">💾 Salvar Relatório</button>
+                <button style="background:#64748b; color:white;" onclick="fecharRelatorioProfissional()">Fechar</button>
+            </div>
+        </div>
+
+        <div class="card" id="cardRelatorioDespesas" style="display: none;">
+            <h2>Relatório de Despesas por Prefixo</h2>
+            <div class="report-filter-box no-print">
+                <div class="report-filter-title">🚖 Prefixo do carro</div>
+                <div class="report-date-grid">
+                    <div>
+                        <label>Prefixo / placa</label>
+                        <input type="text" id="relDespesaPrefixo" placeholder="Ex: TX-024">
+                    </div>
+                    <div>
+                        <label>Período rápido</label>
+                        <div class="report-quick-buttons">
+                            <button type="button" onclick="aplicarPeriodoRelatorioDespesa(7)">7 dias</button>
+                            <button type="button" onclick="aplicarPeriodoRelatorioDespesa(15)">15 dias</button>
+                            <button type="button" onclick="aplicarPeriodoRelatorioDespesa(30)">30 dias</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-date-grid">
+                    <div>
+                        <label>Data inicial</label>
+                        <input type="date" id="relDespesaDataInicial">
+                    </div>
+                    <div>
+                        <label>Data final</label>
+                        <input type="date" id="relDespesaDataFinal">
+                    </div>
+                </div>
+                <div class="report-filter-actions">
+                    <button type="button" class="btn-relatorio" onclick="gerarRelatorioDespesas()">Gerar despesas</button>
+                    <button type="button" style="background:#e2e8f0; color:#334155;" onclick="limparPeriodoRelatorioDespesa()">Tudo</button>
+                </div>
+            </div>
+            <div class="report-output" id="reportDespesasOutput"></div>
+            <div class="report-toolbar no-print">
+                <button class="btn-relatorio" onclick="salvarRelatorioDespesasPDF()">💾 Salvar Rel. Despesas</button>
+                <button class="btn-relatorio" onclick="copiarRelatorioDespesas()">📋 Copiar</button>
+                <button style="background:#64748b; color:white;" onclick="fecharRelatorioDespesas()">Fechar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -257,10 +448,168 @@
     </div>
 </div>
 
+
+<!-- MODAL DE CADASTRO DE MOTORISTA -->
+<div class="modal" id="modalCadastroMotorista">
+    <div class="modal-content">
+        <div class="driver-form-head">
+            <div class="driver-avatar">👤</div>
+            <div>
+                <h3 style="font-size:18px; margin:0;">Cadastrar Motorista</h3>
+                <div class="driver-subtitle">Crie o acesso do motorista de forma rápida, sem prompts e sem digitar códigos soltos.</div>
+            </div>
+        </div>
+
+        <div class="driver-grid">
+            <div class="driver-mini-card input-group">
+                <label for="novoMotoristaUsuario">Nome de usuário</label>
+                <input type="text" id="novoMotoristaUsuario" placeholder="Ex: andre, joao, carro12" autocomplete="off">
+            </div>
+
+            <div class="driver-mini-card input-group">
+                <label for="novoMotoristaSenha">Senha de acesso</label>
+                <input type="password" id="novoMotoristaSenha" placeholder="Digite a senha do motorista">
+            </div>
+
+            <div class="driver-mini-card input-group">
+                <label for="novoMotoristaTipo">Tipo de contrato</label>
+                <select id="novoMotoristaTipo" onchange="atualizarCamposTipoPagamentoMotorista()">
+                    <option value="comissionado">Comissionado</option>
+                    <option value="quilometragem">Paga por quilometragem ao dono</option>
+                </select>
+            </div>
+
+            <div class="driver-mini-card input-group" id="boxComissaoMotorista">
+                <label for="novoMotoristaComissao">Comissão do motorista (%)</label>
+                <input type="number" step="0.01" id="novoMotoristaComissao" placeholder="Ex: 30">
+            </div>
+
+            <div class="driver-mini-card input-group" id="boxValorKmMotorista" style="display:none;">
+                <label for="novoMotoristaValorKm">Valor por KM pago ao dono do carro (R$)</label>
+                <input type="number" step="0.01" id="novoMotoristaValorKm" placeholder="Ex: 1.20">
+            </div>
+
+            <div class="driver-mini-card input-group">
+                <label for="novoMotoristaPrefixo">Prefixo / carro padrão</label>
+                <input type="text" id="novoMotoristaPrefixo" placeholder="Opcional. Ex: TX-024">
+            </div>
+        </div>
+
+        <div class="driver-help">
+            Dica: em comissionado, o fechamento calcula quanto o motorista recebe. Por quilometragem, o fechamento usa hodômetro inicial/final para calcular quanto o motorista paga ao dono do carro.
+        </div>
+
+        <div class="driver-actions">
+            <button class="btn-secondary-clean" style="flex:1;" onclick="fecharModalCadastroMotorista()">Cancelar</button>
+            <button class="btn-incluir" style="flex:1.4;" onclick="salvarNovoMotoristaMaster()">✅ Salvar Motorista</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- MODAL DE DESPESA DO TURNO -->
+<div class="modal" id="modalDespesaTurno">
+    <div class="modal-content">
+        <div class="driver-form-head">
+            <div class="driver-avatar">⛽</div>
+            <div>
+                <h3 style="font-size:18px; margin:0;">Lançar Despesa do Turno</h3>
+                <div class="driver-subtitle">Use para gasolina, manutenção ou outra despesa feita durante o turno do carro.</div>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>Tipo de despesa</label>
+            <select id="inputDespesaTipo">
+                <option value="gasolina">Gasolina / combustível</option>
+                <option value="manutencao">Manutenção</option>
+                <option value="outros">Outros</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Valor (R$)</label>
+            <input type="number" step="0.01" id="inputDespesaValor" placeholder="0,00">
+        </div>
+        <div class="input-group">
+            <label>Descrição opcional</label>
+            <input type="text" id="inputDespesaDescricao" placeholder="Ex: posto, óleo, pneu, lavagem">
+        </div>
+        <div class="driver-actions">
+            <button class="btn-secondary-clean" style="flex:1;" onclick="fecharModalDespesaTurno()">Cancelar</button>
+            <button class="btn-incluir" style="flex:1.4;" onclick="salvarDespesaTurno()">✅ Salvar Despesa</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE CADASTRO DE PREFIXO -->
+<div class="modal" id="modalCadastroPrefixo">
+    <div class="modal-content">
+        <div class="driver-form-head">
+            <div class="driver-avatar">🚗</div>
+            <div>
+                <h3 style="font-size:18px; margin:0;">Cadastrar Prefixo de Carro</h3>
+                <div class="driver-subtitle">Adicione um novo carro à sua frota</div>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>Prefixo / Placa</label>
+            <input type="text" id="inputPrefixoPlaca" placeholder="Ex: ABC-1234" autocomplete="off" style="text-transform: uppercase;">
+        </div>
+        <div class="input-group">
+            <label>Modelo do Carro</label>
+            <input type="text" id="inputPrefixoModelo" placeholder="Ex: Toyota Corolla" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label>Cor</label>
+            <input type="text" id="inputPrefixoCor" placeholder="Ex: Branco" autocomplete="off">
+        </div>
+        <div class="driver-actions">
+            <button class="btn-secondary-clean" style="flex:1;" onclick="fecharModalCadastroPrefixo()">Cancelar</button>
+            <button class="btn-incluir" style="flex:1.4;" onclick="salvarNovoPrefixo()">✅ Salvar Prefixo</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE GERENCIAMENTO DE PONTO -->
+<div class="modal" id="modalGerenciamentoPonto">
+    <div class="modal-content">
+        <div class="driver-form-head">
+            <div class="driver-avatar">📍</div>
+            <div>
+                <h3 style="font-size:18px; margin:0;">Gerenciar Ponto</h3>
+                <div class="driver-subtitle">Informações da sua base de táxi</div>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>Nome do Ponto</label>
+            <input type="text" id="inputPontoNome" placeholder="Ex: Táxi Central" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label>Telefone</label>
+            <input type="tel" id="inputPontoTelefone" placeholder="(XX) XXXXX-XXXX" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label>Endereço</label>
+            <input type="text" id="inputPontoEndereco" placeholder="Ex: Rua das Flores, 123" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label>Cidade</label>
+            <input type="text" id="inputPontoCidade" placeholder="Ex: São Paulo" autocomplete="off">
+        </div>
+        <div class="driver-actions">
+            <button class="btn-secondary-clean" style="flex:1;" onclick="fecharModalGerenciamentoPonto()">Cancelar</button>
+            <button class="btn-incluir" style="flex:1.4;" onclick="salvarAlteracoesPonto()">✅ Salvar Alterações</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="cordova.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/pdf-driverflux-fallback.js"></script>
+
 <script src="js/geolocation.js"></script>
+<script src="js/login-fix.js"></script>
 <script src="js/app.js"></script>
 
 </body>
