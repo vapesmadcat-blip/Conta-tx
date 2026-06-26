@@ -2948,6 +2948,37 @@ async function salvarRelatorioComoArquivo() {
     }
 }
 
+async function abrirRelatorioPDF() {
+    const output = document.getElementById('reportOutput');
+    const texto = dfTextoLimpoParaPdf(output?.innerText || '');
+    if (!texto) return alert('Gere o relatório antes de abrir.');
+
+    try {
+        const blob = dfCriarPdfBlobDriverFlux('Relatório Driver Flux', texto);
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Opcional: revogar URL após algum tempo para liberar memória
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+        alert('❌ Erro ao abrir PDF: ' + (e.message || e));
+    }
+}
+
+async function abrirRelatorioDespesasPDF() {
+    const output = document.getElementById('reportDespesasOutput');
+    const texto = dfTextoLimpoParaPdf(output?.innerText || '');
+    if (!texto) return alert('Gere o relatório de despesas antes de abrir.');
+
+    try {
+        const blob = dfCriarPdfBlobDriverFlux('Relatório de Despesas Driver Flux', texto);
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+        alert('❌ Erro ao abrir PDF: ' + (e.message || e));
+    }
+}
+
 async function imprimirRelatorioPDF() {
     // No Android WebView, window.print costuma falhar. Aqui geramos PDF real.
     await salvarRelatorioComoArquivo();
