@@ -1124,7 +1124,8 @@ function salvarNovoMotoristaMaster() {
         valorKmDono: valorKmDono,
         primeiroLogin: true,      // NOVO - força troca de senha no primeiro acesso
         ponto: pontoMaster,       // Nome do ponto
-        pontoId: pontoId          // ID do ponto
+        pontoId: pontoId,         // ID do ponto
+        masterId: usuarioLogado   // Vínculo com o Master que o cadastrou
     };
     
     if (prefixo) {

@@ -280,10 +280,21 @@
         }
 
         try {
+            // Obter dados atuais do usuário para não perder o masterId e pontoId já vinculados pelo Master
+            const snapUser = await db.ref(`usuarios/${user}`).once('value');
+            const dadosAtuais = snapUser.val() || {};
+
             // Prepare update object
             const updates = isMaster
                 ? { senha: novaSenha, primeiroLoginMaster: false, ponto: nomePonto }
-                : { senha: novaSenha, primeiroLogin: false };
+                : { 
+                    senha: novaSenha, 
+                    primeiroLogin: false,
+                    // Garante que o vínculo criado pelo Master seja mantido e reforçado
+                    ponto: dadosAtuais.ponto || '',
+                    pontoId: dadosAtuais.pontoId || '',
+                    masterId: dadosAtuais.masterId || ''
+                  };
 
             // Update user in Firebase
             await db.ref(`usuarios/${user}`).update(updates);
