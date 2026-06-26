@@ -691,17 +691,39 @@ function enviarReciboWhatsAppDriverFlux() {
         if (telefone) telefone.focus();
         return;
     }
-    window.location.href = `whatsapp://send?phone=${numero}&text=${encodeURIComponent(reciboAtualDriverFlux)}`;
+    
+    const texto = encodeURIComponent(reciboAtualDriverFlux);
+    const urlWhatsAppWeb = `https://wa.me/${numero}?text=${texto}`;
+    const urlWhatsAppApp = `whatsapp://send?phone=${numero}&text=${texto}`;
+    
+    try {
+        window.location.href = urlWhatsAppApp;
+        setTimeout(() => {
+            if (document.hasFocus()) {
+                window.open(urlWhatsAppWeb, '_blank');
+            }
+        }, 1500);
+    } catch (e) {
+        window.open(urlWhatsAppWeb, '_blank');
+    }
 }
 
 function copiarReciboDriverFlux() {
     copiarTextoDriverFlux(reciboAtualDriverFlux, '✅ Recibo copiado. Agora você pode colar no WhatsApp ou em outro aplicativo.');
 }
 
-function imprimirReciboDriverFlux() {
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Recibo DriverFlux</title><style>body{font-family:Arial,sans-serif;padding:18px;color:#0f172a}.recibo{max-width:420px;margin:auto;border:1px solid #e2e8f0;border-radius:14px;padding:16px;line-height:1.55}h2{margin-top:0}</style></head><body><div class="recibo"><h2>🧾 Recibo DriverFlux</h2>${textoReciboParaHtml(reciboAtualDriverFlux)}</div><script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script></body></html>`;
-    abrirRelatorioEmNovaJanela(html);
-    alert('Se a tela de impressão abrir, escolha “Salvar em PDF”.');
+async function imprimirReciboDriverFlux() {
+    try {
+        const titulo = 'Recibo DriverFlux';
+        const blob = dfCriarPdfBlobDriverFlux(titulo, reciboAtualDriverFlux);
+        const nomeArquivo = 'Recibo_DriverFlux_' + timestampArquivoDriverFlux() + '.pdf';
+        await salvarArquivoDriverFlux(blob, nomeArquivo, 'Recibo DriverFlux', reciboAtualDriverFlux);
+    } catch (e) {
+        console.warn('Erro ao gerar PDF do recibo:', e);
+        const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Recibo DriverFlux</title><style>body{font-family:Arial,sans-serif;padding:18px;color:#0f172a}.recibo{max-width:420px;margin:auto;border:1px solid #e2e8f0;border-radius:14px;padding:16px;line-height:1.55}h2{margin-top:0}</style></head><body><div class="recibo"><h2>Recibo DriverFlux</h2>${textoReciboParaHtml(reciboAtualDriverFlux)}</div><script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script></body></html>`;
+        abrirRelatorioEmNovaJanela(html);
+        alert('Se a tela de impressão abrir, escolha "Salvar em PDF".');
+    }
 }
 
 function emititNotaFiscalWhatsApp(idCorrida) {
@@ -2923,20 +2945,6 @@ async function salvarRelatorioComoArquivo() {
         await salvarArquivoDriverFlux(blob, nome, 'Relatório Driver Flux', texto);
     } catch (e) {
         alert('❌ Erro ao gerar PDF: ' + (e.message || e));
-    }
-}
-
-async function salvarRelatorioDespesasPDF() {
-    const output = document.getElementById('reportDespesasOutput');
-    const texto = dfTextoLimpoParaPdf(output?.innerText || '');
-    if (!texto) return alert('Gere o relatório de despesas antes de salvar.');
-
-    try {
-        const blob = dfCriarPdfBlobDriverFlux('Relatório de Despesas - Driver Flux', texto);
-        const nome = 'DriverFlux_Relatorio_Despesas_' + timestampArquivoDriverFlux() + '.pdf';
-        await salvarArquivoDriverFlux(blob, nome, 'Relatório de Despesas Driver Flux', texto);
-    } catch (e) {
-        alert('❌ Erro ao gerar PDF de despesas: ' + (e.message || e));
     }
 }
 

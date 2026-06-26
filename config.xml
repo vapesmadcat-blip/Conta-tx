@@ -4,6 +4,9 @@
     <description>Sistema de Gestão de Corridas e Frota de Táxi</description>
     <access origin="*" />
     <allow-navigation href="https://*/*" />
+    <allow-intent href="whatsapp://*" />
+    <allow-intent href="intent://*" />
+    <allow-intent href="market://*" />
     
     <!-- Permissões para GPS e Localização -->
     <permission name="ACCESS_FINE_LOCATION" />
