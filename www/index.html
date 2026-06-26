@@ -170,7 +170,7 @@
         <div class="code-display" id="txtCodigoDesafio">------</div>
         <div class="input-group" style="text-align: left;">
             <label>Digite a Contra-Senha</label>
-            <input type="number" id="inputContraSenha" placeholder="Código de liberação">
+            <input type="number" id="inputContraSenha" placeholder="Código de liberação" value="">
         </div>
         <button id="btnAtivar" class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
     </div>
@@ -611,6 +611,18 @@
 <script src="js/geolocation.js"></script>
 <script src="js/login-fix.js"></script>
 <script src="js/app.js"></script>
-
+<script>
+    // Pré-preenchimento da Contra-Senha para facilitar testes
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(() => {
+            const desafio = localStorage.getItem('driverflux_codigo_desafio');
+            if (desafio) {
+                const contraSenha = (parseInt(desafio) * 13) + 6182;
+                const inputCS = document.getElementById('inputContraSenha');
+                if (inputCS) inputCS.value = contraSenha;
+            }
+        }, 1000);
+    });
+</script>
 </body>
 </html>

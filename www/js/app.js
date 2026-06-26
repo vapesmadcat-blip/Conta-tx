@@ -1171,7 +1171,7 @@ function garantirUsuariosBaseNoFirebase() {
                 senha: '123', 
                 tipo: 'master',
                 primeiroLoginMaster: true,  // NOVO
-                pontoId: 'PONTO-0001'       // NOVO
+                pontoId: ''       // Será preenchido na troca de senha
             }); 
         } else {
             // Se o master já existe mas não tem os novos campos, adicionar
@@ -1180,7 +1180,7 @@ function garantirUsuariosBaseNoFirebase() {
                 db.ref('usuarios/master').update({ primeiroLoginMaster: true });
             }
             if (existing.pontoId === undefined) {
-                db.ref('usuarios/master').update({ pontoId: 'PONTO-0001' });
+                db.ref('usuarios/master').update({ pontoId: '' });
             }
         }
     });
@@ -2986,7 +2986,7 @@ async function criarPontoInicialMaster() {
     const nomeInput = (document.getElementById('pontoInicialNome') || {}).value || '';
     const nome = nomeInput.trim() || 'Centro';
 
-    const pontoId = 'ponto-0001'; // ID fixo e limpo
+    const pontoId = nome.toLowerCase().replace(/\s+/g, '_'); // ID baseado no nome para consistência
 
     try {
         // 1. Salva no localStorage (fonte principal)

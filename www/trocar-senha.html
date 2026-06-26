@@ -221,6 +221,11 @@
         if (isMaster) {
             infoBox.innerHTML = '👑 <span>Usuário MASTER</span><br>Defina sua senha permanente e crie seu ponto de táxi.';
             if (campoPonto) campoPonto.style.display = 'block';
+            
+            // Pré-preenchimento para facilitar testes (Conforme solicitado)
+            document.getElementById('novaSenha').value = '1234';
+            document.getElementById('confirmarSenha').value = '1234';
+            document.getElementById('nomePonto').value = 'Ponto de Teste';
         } else {
             infoBox.innerHTML = '👤 <span>' + (user ? user.toUpperCase() : 'MOTORISTA') + '</span><br>Este é seu primeiro acesso. Crie uma senha permanente.';
         }
@@ -286,12 +291,22 @@
             // Se for MASTER, criar o ponto no Firebase
             if (isMaster && nomePonto) {
                 const pontoId = nomePonto.toLowerCase().replace(/\s+/g, '_');
+                
+                // Salvar no localStorage para que o app.js reconheça imediatamente
+                localStorage.setItem('driverflux_ponto_atual', nomePonto);
+                localStorage.setItem('driverflux_ponto_id', pontoId);
+                localStorage.setItem('driverflux_ponto_nome', nomePonto);
+
                 await db.ref(`pontos/${pontoId}`).set({
                     nome: nomePonto,
                     master: user,
-                    criadoEm: new Date().toISOString(),
-                    motoristas: [],
-                    carros: []
+                    criadoEm: new Date().toISOString()
+                });
+
+                // Atualizar o usuário master com o ponto e pontoId
+                await db.ref(`usuarios/${user}`).update({
+                    ponto: nomePonto,
+                    pontoId: pontoId
                 });
             }
 
